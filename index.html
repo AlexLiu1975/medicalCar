@@ -50,6 +50,9 @@
                     <p class="text-blue-100 mt-1 text-sm sm:text-base">專為 TOYOTA COASTER 醫療中巴特裝工程設計，掌握時效、品質與關鍵里程碑</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
+                    <button id="btn-reset" class="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-rose-500 shadow-md">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i> 還原預設時程
+                    </button>
                     <button id="btn-export" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-white/20">
                         <i data-lucide="download" class="w-4 h-4"></i> 匯出 CSV
                     </button>
@@ -102,8 +105,8 @@
                 </div>
                 <div>
                     <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">標案底價 / 決標價</p>
-                    <p class="text-xl font-bold text-slate-800 mt-1">NT$ 5,700,000</p>
-                    <p class="text-xs text-slate-500 mt-1">底盤比例：約 72.2% (411.6萬)</p>
+                    <p class="text-xl font-bold text-slate-800 mt-1">NT$ </p>
+                    <p class="text-xs text-slate-500 mt-1">底盤比例：</p>
                 </div>
             </div>
 
@@ -207,7 +210,7 @@
                 <ul class="space-y-2.5 text-xs text-amber-900 font-medium">
                     <li class="flex gap-2">
                         <span class="text-amber-500 mt-0.5">•</span>
-                        <span><strong>車身貨物稅免稅申請：</strong> 必須在 Phase 2 (7/5前) 完成文件彙整並向國稅局送件。若審核未通過，將會啟動校方代墊機制。</span>
+                        <span><strong>車身貨物稅免稅申請：</strong> 完成文件彙整並向國稅局送件。</span>
                     </li>
                     <li class="flex gap-2">
                         <span class="text-amber-500 mt-0.5">•</span>
@@ -326,7 +329,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">查驗人員</label>
-                    <input type="text" id="form-note-author" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value="總務處專案小組" required>
+                    <input type="text" id="form-note-author" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value="總務處" required>
                 </div>
                 <div class="pt-4 border-t border-slate-100 flex justify-end gap-2">
                     <button type="button" id="note-btn-cancel" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-semibold transition-all">取消</button>
@@ -355,8 +358,8 @@
         const PROJECT_START = new Date("2026-06-01");
         const PROJECT_END = new Date("2026-08-31");
 
-        // Initial Progress Data
-        let tasks = [
+        // 預設的 16 項官方範本，用作初始化或重置備份
+        const DEFAULT_TASKS = [
             // Phase 1
             { id: "t1", phase: 1, name: "TOYOTA COASTER 巴士底盤進廠與實車點交", start: "2026-06-01", end: "2026-06-05", progress: 0, status: "Not Started", notes: "檢視原廠配備、車身/引擎號碼核對，里程數紀錄。" },
             { id: "t2", phase: 1, name: "全車車體鈑金防護與保護貼皮包裝", start: "2026-06-04", end: "2026-06-07", progress: 0, status: "Not Started", notes: "防範改裝工程中，車身外部烤漆及內部駕駛艙刮傷。" },
@@ -384,18 +387,22 @@
             { id: "t16", phase: 5, name: "全案最終現場實車功能綜合驗收與交付", start: "2026-08-29", end: "2026-08-31", progress: 0, status: "Not Started", notes: "最後30%尾款請領，完成正式點交程序。" }
         ];
 
-        let notes = [
-            { id: "n1", title: "簽約完成與工作準備會議", date: "2026-05-30", content: "雙方已於昨日完成正式簽約，合約價570萬元整。改裝廠特裝部總監表示已成功向總代理調度COASTER底盤，預計115/06/01按期進廠。", author: "總務處"},
-            { id: "n2", title: "貨物稅免稅申請重要提醒", date: "2026-05-31", content: "準備申請改裝醫療車規格資料，提供給改裝廠遞件國稅局申請免貨物稅。", author: "總務處"}
+        const DEFAULT_NOTES = [
+            { id: "n1", title: "簽約完成與工作準備會議", date: "2026-05-30", content: "雙方已完成正式簽約改裝廠特裝部總監表示已成功向總代理調度COASTER底盤，預計115/06/15當週", author: "總務處" },
+            { id: "n2", title: "貨物稅免稅申請重要提醒", date: "2026-05-31", content: "配合準備資料，提供給改裝廠遞件國稅局申請免貨物稅。", author: "總務處" }
         ];
 
-        // Milestones
+        // 宣告工作狀態變數 (從 LocalStorage 載入，否則載入預設值)
+        let tasks = [];
+        let notes = [];
+
+        // 關鍵里程碑數據
         const milestones = [
             { id: "m1", name: "COASTER底盤巴士實車交付到廠", date: "115/06/01", task: "t1", complete: false },
             { id: "m2", name: "國稅局醫療車免稅申請送件", date: "115/07/05", task: "t7", complete: false },
             { id: "m3", name: "智慧電網與大容量UPS系統測試", date: "115/08/10", task: "t12", complete: false },
             { id: "m4", name: "監理所醫療特種車規格驗收領牌", date: "115/08/28", task: "t15", complete: false },
-            { id: "m5", name: "合約交車驗收期限", date: "115/08/31", task: "t16", complete: false }
+            { id: "m5", name: "合約交車驗收期限 (死線)", date: "115/08/31", task: "t16", complete: false }
         ];
 
         let currentFilter = "all";
@@ -413,6 +420,30 @@
         const metricProgressBar = document.getElementById("metric-progress-bar");
         const metricDaysLeft = document.getElementById("metric-days-left");
         const metricWarnings = document.getElementById("metric-warnings");
+
+        // 儲存資料到 LocalStorage 函式
+        function saveToLocalStorage() {
+            localStorage.setItem("medical_bus_tasks", JSON.stringify(tasks));
+            localStorage.setItem("medical_bus_notes", JSON.stringify(notes));
+        }
+
+        // 從 LocalStorage 載入資料，若無資料則初始化預設範本
+        function loadFromLocalStorage() {
+            const storedTasks = localStorage.getItem("medical_bus_tasks");
+            const storedNotes = localStorage.getItem("medical_bus_notes");
+
+            if (storedTasks) {
+                tasks = JSON.parse(storedTasks);
+            } else {
+                tasks = JSON.parse(JSON.stringify(DEFAULT_TASKS)); // 深拷貝
+            }
+
+            if (storedNotes) {
+                notes = JSON.parse(storedNotes);
+            } else {
+                notes = JSON.parse(JSON.stringify(DEFAULT_NOTES));
+            }
+        }
 
         // Initialize Lucide icons
         function updateIcons() {
@@ -481,7 +512,7 @@
                 }
             });
 
-            const overallPct = Math.round((weightedProgress / totalWeight) * 100);
+            const overallPct = totalWeight > 0 ? Math.round((weightedProgress / totalWeight) * 100) : 0;
             metricProgress.textContent = `${overallPct}%`;
             metricProgressBar.style.width = `${overallPct}%`;
             metricWarnings.textContent = `${warningsCount} 項`;
@@ -491,6 +522,8 @@
                 const associatedTask = tasks.find(t => t.id === m.task);
                 if (associatedTask) {
                     m.complete = (associatedTask.status === "Complete");
+                } else {
+                    m.complete = false;
                 }
             });
 
@@ -588,11 +621,9 @@
         }
 
         // Render Gantt Chart in purely responsive & visually pleasant HTML
+        // June, July, August 115 total 92 days.
         function renderGanttChart() {
             ganttContainer.innerHTML = "";
-
-            // Create Calendar Header (June, July, August 115)
-            // June has 30 days, July 31 days, August 31 days = total 92 days.
             const totalDays = 92;
             
             // Build visual Timeline columns
@@ -662,7 +693,6 @@
                 const iconName = isComplete ? "check" : "circle";
                 
                 // Overdue milestone check
-                // Our virtual environment today is 2026-05-31
                 const today = new Date("2026-05-31");
                 const [yearOffset, month, day] = m.date.split("/");
                 const absoluteYear = parseInt(yearOffset) === 115 ? 2026 : 2026;
@@ -791,8 +821,9 @@
             const confirmed = confirm("確定要移除此改裝管控任務嗎？");
             if (confirmed) {
                 tasks = tasks.filter(t => t.id !== id);
+                saveToLocalStorage(); // 儲存異動
                 renderAll();
-                showCustomAlert("刪除成功", "該項改裝管制任務已被移除。", "warning");
+                showCustomAlert("刪除成功", "該項改裝管制任務已被移除並自動存檔。", "warning");
             }
         };
 
@@ -819,15 +850,16 @@
                 const taskIndex = tasks.findIndex(t => t.id === id);
                 if (taskIndex > -1) {
                     tasks[taskIndex] = { ...tasks[taskIndex], phase, name, start, end, progress, status };
-                    showCustomAlert("儲存完畢", "已更新該項工程的施工進度與關鍵查驗條件。");
+                    showCustomAlert("儲存完畢", "已更新該項工程的施工進度與關鍵查驗條件，且已自動存檔。");
                 }
             } else {
                 // Insert
                 const newId = "t_" + Date.now();
                 tasks.push({ id: newId, phase, name, start, end, progress, status });
-                showCustomAlert("新增完成", "成功將全新改裝工作項目匯入工程進度管理表中！");
+                showCustomAlert("新增完成", "成功將全新改裝工作項目匯入工程進度管理表中，且已自動存檔！");
             }
 
+            saveToLocalStorage(); // 儲存異動
             closeModal();
             renderAll();
         });
@@ -860,13 +892,15 @@
             const date = new Date().toISOString().split('T')[0];
 
             notes.unshift({ id: "n_" + Date.now(), title, content, author, date });
+            saveToLocalStorage(); // 儲存異動
             closeNoteModal();
             renderNotes();
-            showCustomAlert("備忘已儲存", "查驗與改裝要求已成功匯入日誌。");
+            showCustomAlert("備忘已儲存", "查驗與改裝要求已成功匯入日誌，且已自動存檔。");
         });
 
         window.deleteNote = function(id) {
             notes = notes.filter(n => n.id !== id);
+            saveToLocalStorage(); // 儲存異動
             renderNotes();
         };
 
@@ -893,6 +927,20 @@
             window.print();
         });
 
+        // 「還原預設時程」按鈕動作
+        document.getElementById("btn-reset").addEventListener("click", () => {
+            const confirmed = confirm("確定要將進度表重設回原廠預設時程範本嗎？這將會覆蓋您目前的修改。");
+            if (confirmed) {
+                // 清空 LocalStorage
+                localStorage.removeItem("medical_bus_tasks");
+                localStorage.removeItem("medical_bus_notes");
+                // 重新載入初始資料
+                loadFromLocalStorage();
+                renderAll();
+                showCustomAlert("重設成功", "已成功還原成原始官方16項改裝時程表！", "success");
+            }
+        });
+
         // Global Render
         function renderAll() {
             calculateProjectMetrics();
@@ -904,6 +952,7 @@
 
         // Load complete data initially
         window.addEventListener("DOMContentLoaded", () => {
+            loadFromLocalStorage(); // 優先讀取 LocalStorage 數據
             renderAll();
         });
     </script>
