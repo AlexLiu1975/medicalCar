@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>行動智慧醫療車改裝工程進度管控系統</title>
+    <title>行動智慧醫療車改裝工程進度管控系統 - 雲端協作版</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -39,19 +39,22 @@
         <div class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <div class="flex items-center gap-2 mb-2">
+                    <div class="flex flex-wrap items-center gap-2 mb-2">
                         <span class="bg-blue-500 text-white text-xs px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">專案管控</span>
                         <span class="bg-emerald-500 text-white text-xs px-2.5 py-1 rounded-full font-bold">115年度偏鄉醫療計畫</span>
+                        <span id="sync-badge" class="bg-slate-600 text-white text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse"></span> 初始化中...
+                        </span>
                     </div>
                     <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight flex items-center gap-3">
                         <i data-lucide="truck" class="w-8 h-8 text-blue-300"></i>
                         偏鄉行動智慧醫療車改裝工程 — 工作進度管控系統
                     </h1>
-                    <p class="text-blue-100 mt-1 text-sm sm:text-base">專為 TOYOTA COASTER 醫療中巴特裝工程設計，掌握時效、品質與關鍵里程碑</p>
+                    <p class="text-blue-100 mt-1 text-sm sm:text-base">專為 TOYOTA COASTER 醫療中巴特裝工程設計，多人即時協作編輯與時效控管</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <button id="btn-reset" class="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-rose-500 shadow-md">
-                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i> 還原預設時程
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i> 重設雲端進度
                     </button>
                     <button id="btn-export" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-white/20">
                         <i data-lucide="download" class="w-4 h-4"></i> 匯出 CSV
@@ -59,6 +62,18 @@
                     <button id="btn-print" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 shadow-md">
                         <i data-lucide="printer" class="w-4 h-4"></i> 列印管控表
                     </button>
+                </div>
+            </div>
+            
+            <!-- User Status Console -->
+            <div class="mt-4 pt-4 border-t border-white/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-blue-200">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="users" class="w-4 h-4 text-blue-300"></i>
+                    <span>您的專屬協作帳號 UID：</span>
+                    <span id="user-uid" class="font-mono bg-blue-900/40 text-white px-2 py-0.5 rounded border border-blue-600/30 break-all select-all">未登入</span>
+                </div>
+                <div id="connection-indicator" class="flex items-center gap-1.5 text-emerald-300 font-medium">
+                    <!-- Dynamic -->
                 </div>
             </div>
         </div>
@@ -166,7 +181,7 @@
                         <i data-lucide="list-todo" class="w-5 h-5 text-blue-600"></i>
                         改裝工作分解結構與檢驗項目表
                     </h2>
-                    <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md font-medium" id="task-count">共 15 項任務</span>
+                    <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md font-medium" id="task-count">載入中...</span>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
@@ -246,8 +261,8 @@
     <!-- Footer -->
     <footer class="bg-slate-900 text-slate-400 py-6 mt-12 border-t border-slate-800 text-center text-xs">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <p>© 115年度 偏鄉行動智慧醫療車改裝專案小組 研製. 所有進度內容具正式合約參考效力。</p>
-            <p class="mt-1 text-slate-500">依據政府採購法、合約書規範及車輛改裝專業項目編製</p>
+            <p>© 115年度 偏鄉行動智慧醫療車改裝專案小組 研製. 所有進度內容具正式合約與多人在線同步效力。</p>
+            <p class="mt-1 text-slate-500">依據政府採購法、合約書規範、救護車特裝安全基準及變更檢驗標準編製</p>
         </div>
     </footer>
 
@@ -353,50 +368,59 @@
         </div>
     </div>
 
-    <script>
-        // Project Start and End Dates (115/06/01 - 115/08/31)
+    <!-- CUSTOM CONFIRM MODAL -->
+    <div id="confirm-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div class="mx-auto w-12 h-12 rounded-full flex items-center justify-center bg-rose-50 text-rose-600">
+                <i data-lucide="help-circle" class="w-6 h-6"></i>
+            </div>
+            <div class="text-center">
+                <h4 id="confirm-title" class="text-base font-bold text-slate-800">確認操作</h4>
+                <p id="confirm-message" class="text-sm text-slate-500 mt-1">您確定要執行此操作嗎？此動作將無法復原。</p>
+            </div>
+            <div class="flex gap-2">
+                <button id="confirm-btn-cancel" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-xl text-sm font-semibold transition-all">取消</button>
+                <button id="confirm-btn-action" class="flex-1 bg-rose-600 hover:bg-rose-500 text-white py-2 rounded-xl text-sm font-semibold transition-all">確定執行</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK Modules -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Constants & Global configurations
         const PROJECT_START = new Date("2026-06-01");
         const PROJECT_END = new Date("2026-08-31");
 
-        // 預設的 16 項官方範本，用作初始化或重置備份
+        // 16 標準任務範本
         const DEFAULT_TASKS = [
-            // Phase 1
             { id: "t1", phase: 1, name: "TOYOTA COASTER 巴士底盤進廠與實車點交", start: "2026-06-01", end: "2026-06-05", progress: 0, status: "Not Started", notes: "檢視原廠配備、車身/引擎號碼核對，里程數紀錄。" },
             { id: "t2", phase: 1, name: "全車車體鈑金防護與保護貼皮包裝", start: "2026-06-04", end: "2026-06-07", progress: 0, status: "Not Started", notes: "防範改裝工程中，車身外部烤漆及內部駕駛艙刮傷。" },
             { id: "t3", phase: 1, name: "原廠內裝/座椅拆卸工程與車底結構補強材料購置", start: "2026-06-06", end: "2026-06-10", progress: 0, status: "Not Started", notes: "將原座椅全數拆卸，採購高強度不銹鋼結構樑補強件。" },
-            
-            // Phase 2
             { id: "t4", phase: 2, name: "車體骨架與智慧配電支撐網焊接工程", start: "2026-06-11", end: "2026-06-20", progress: 0, status: "Not Started", notes: "依據醫療櫃與超音波、診療椅配重，對大樑進行補強與架設骨架。" },
             { id: "t5", phase: 2, name: "高壓電力線路/網路/醫療智慧訊號多軌鋪設", start: "2026-06-18", end: "2026-06-28", progress: 0, status: "Not Started", notes: "電線外部必須套上防火浪管。醫療訊號與AC電力線平行間距至少20cm防止干擾。" },
             { id: "t6", phase: 2, name: "車體側面車邊帳安裝點結構強化與固定", start: "2026-06-26", end: "2026-07-02", progress: 0, status: "Not Started", notes: "高規防風手動車邊帳重負荷固定座焊接與防鏽處理。" },
             { id: "t7", phase: 2, name: "向國稅局提交醫療巡迴車「免徵貨物稅」申請", start: "2026-06-25", end: "2026-07-05", progress: 0, status: "Not Started", notes: "整合合約、偏鄉計畫、設計圖，趕在此階段結束前送件，避免影響領牌。" },
-
-            // Phase 3
             { id: "t8", phase: 3, name: "車體高密度防震隔音棉與全車防火裝潢板封裝", start: "2026-07-06", end: "2026-07-15", progress: 0, status: "Not Started", notes: "確保車廂具備良好的冷房效果與高密度的隔音功能。" },
             { id: "t9", phase: 3, name: "防滑防靜電高規格抗菌医疗級地板舖設", start: "2026-07-16", end: "2026-07-20", progress: 0, status: "Not Started", notes: "地板接口需熱熔接無縫處理，防水並利於日常消毒與血漬清理。" },
             { id: "t10", phase: 3, name: "輕量化防震醫療櫃、病歷櫃與洗手槽配置安裝", start: "2026-07-21", end: "2026-07-31", progress: 0, status: "Not Started", notes: "櫃門配備防震自動彈鎖、防止行駛中櫃門開啟物品拋出。" },
-
-            // Phase 4
             { id: "t11", phase: 4, name: "多功能智慧微創診療床（或病床）底座強化鎖固", start: "2026-08-01", end: "2026-08-05", progress: 0, status: "Not Started", notes: "診療床底座直接鎖於車體補強樑，進行承重與升降電機測試。" },
             { id: "t12", phase: 4, name: "車載智能UPS發電機系統與醫療冷氣系統測試", start: "2026-08-04", end: "2026-08-10", progress: 0, status: "Not Started", notes: "模擬停電狀態，測試鋰鐵電池組無縫接軌供電，醫療冷氣正常運轉2小時以上。" },
             { id: "t13", phase: 4, name: "5G/Wi-Fi偏鄉智慧遠距會診多模通訊設備整合", start: "2026-08-09", end: "2026-08-15", progress: 0, status: "Not Started", notes: "與高醫大總院進行即時影像串流與病歷系統同步連線實測。" },
-
-            // Phase 5
             { id: "t14", phase: 5, name: "全車外部高醫大專屬識別彩繪噴漆烤漆", start: "2026-08-16", end: "2026-08-22", progress: 0, status: "Not Started", notes: "字體清晰醒目，具備行動智慧醫療車圖騰與偏鄉關懷字樣。" },
             { id: "t15", phase: 5, name: "監理所特種醫療車規格驗車與領牌程序", start: "2026-08-20", end: "2026-08-28", progress: 0, status: "Not Started", notes: "送交車體變更證明，取得監理所核發之專用智慧醫療車牌照。" },
-            { id: "t16", phase: 5, name: "全案最終現場實車功能綜合驗收與交付", start: "2026-08-29", end: "2026-08-31", progress: 0, status: "Not Started", notes: "最後30%尾款請領，完成正式點交程序。" }
+            { id: "t16", phase: 5, name: "全案最終現場實車功能綜合驗收與交付", start: "2026-08-29", end: "2026-08-31", progress: 0, status: "Not Started", notes: "最後 30% 尾款請領，完成正式點交程序。" }
         ];
 
         const DEFAULT_NOTES = [
-            { id: "n1", title: "簽約完成與工作準備會議", date: "2026-05-30", content: "雙方已於昨日完成正式簽約，合約價570萬元整。改裝廠特裝部總監表示已成功向總代理調度COASTER底盤，預計115/06/01按期進廠。", author: "總務處 詹專員" },
+            { id: "n1", title: "簽約完成與工作準備會議", date: "2026-05-30", content: "雙方已於昨日完成正式簽約，合約價 570 萬元整。改裝廠特裝部總監表示已成功向總代理調度 COASTER 底盤，預計 115/06/01 按期進廠。", author: "總務處 詹專員" },
             { id: "n2", title: "貨物稅免稅申請重要提醒", date: "2026-05-31", content: "請會計室配合準備偏鄉公共衛生推廣計畫書，提供給改裝廠在 Phase 2 遞件國稅局申請免貨物稅。如規格未過，則依合約由學校代墊該項稅款。", author: "秘書室主任" }
         ];
 
-        // 宣告工作狀態變數 (從 LocalStorage 載入，否則載入預設值)
-        let tasks = [];
-        let notes = [];
-
-        // 關鍵里程碑數據
+        // 關鍵里程碑
         const milestones = [
             { id: "m1", name: "COASTER底盤巴士實車交付到廠", date: "115/06/01", task: "t1", complete: false },
             { id: "m2", name: "國稅局醫療車免稅申請送件", date: "115/07/05", task: "t7", complete: false },
@@ -405,94 +429,338 @@
             { id: "m5", name: "合約交車驗收期限 (死線)", date: "115/08/31", task: "t16", complete: false }
         ];
 
+        // 狀態變數
+        let tasks = [];
+        let notes = [];
         let currentFilter = "all";
+        let isCloudMode = false;
+        let db = null;
+        let auth = null;
+        let currentUser = null;
+        let appId = "default-app-id";
 
-        // DOM elements
+        // DOM elements cache
         const taskListBody = document.getElementById("task-list-body");
         const ganttContainer = document.getElementById("gantt-container");
         const phaseFilters = document.getElementById("phase-filters");
         const taskCount = document.getElementById("task-count");
         const milestonesContainer = document.getElementById("milestones-container");
         const notesContainer = document.getElementById("notes-container");
-
-        // Metrics elements
         const metricProgress = document.getElementById("metric-progress");
         const metricProgressBar = document.getElementById("metric-progress-bar");
         const metricDaysLeft = document.getElementById("metric-days-left");
         const metricWarnings = document.getElementById("metric-warnings");
+        const userUidDisplay = document.getElementById("user-uid");
+        const connectionIndicator = document.getElementById("connection-indicator");
+        const syncBadge = document.getElementById("sync-badge");
 
-        // 儲存資料到 LocalStorage 函式 (加上 try-catch 保護機制)
-        function saveToLocalStorage() {
+        // Custom Confirm Handling
+        let activeConfirmCallback = null;
+        function showCustomConfirm(title, message, callback) {
+            const modal = document.getElementById("confirm-modal");
+            document.getElementById("confirm-title").textContent = title;
+            document.getElementById("confirm-message").textContent = message;
+            activeConfirmCallback = callback;
+            modal.classList.remove("hidden");
+            updateIcons();
+        }
+
+        document.getElementById("confirm-btn-cancel").addEventListener("click", () => {
+            document.getElementById("confirm-modal").classList.add("hidden");
+            activeConfirmCallback = null;
+        });
+
+        document.getElementById("confirm-btn-action").addEventListener("click", () => {
+            if (activeConfirmCallback) activeConfirmCallback();
+            document.getElementById("confirm-modal").classList.add("hidden");
+            activeConfirmCallback = null;
+        });
+
+        // 1. 初始化 Firebase 模組與 Auth 流程
+        async function initApp() {
+            let firebaseConfig = null;
+            
+            // 嘗試解析環境變數
             try {
-                localStorage.setItem("medical_bus_tasks", JSON.stringify(tasks));
-                localStorage.setItem("medical_bus_notes", JSON.stringify(notes));
+                if (typeof __firebase_config !== "undefined" && __firebase_config) {
+                    firebaseConfig = JSON.parse(__firebase_config);
+                }
             } catch (e) {
-                console.warn("[本地存儲保護] 無法寫入 localStorage (可能處於沙盒/無痕/GitHub預覽環境中)。", e);
+                console.error("Firebase config parsing error:", e);
+            }
+
+            appId = typeof __app_id !== "undefined" ? __app_id : "medical-bus-115";
+
+            if (firebaseConfig && firebaseConfig.apiKey) {
+                // 有效 Firebase 配置，切換至雲端模式
+                try {
+                    const app = initializeApp(firebaseConfig);
+                    auth = getAuth(app);
+                    db = getFirestore(app);
+
+                    // 依據 Rule 3: 先呼叫自訂 Token 或匿名驗證，再執行任何查詢
+                    if (typeof __initial_auth_token !== "undefined" && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+
+                    onAuthStateChanged(auth, (user) => {
+                        if (user) {
+                            currentUser = user;
+                            isCloudMode = true;
+                            userUidDisplay.textContent = user.uid; // 完整呈現 UID
+                            syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> 雲端連線模式`;
+                            syncBadge.className = "bg-emerald-950 text-emerald-300 text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1 border border-emerald-500/20";
+                            connectionIndicator.innerHTML = `<i data-lucide="cloud-lightning" class="w-4 h-4 text-emerald-400"></i> 與雲端資料庫保持即時雙向連線`;
+                            
+                            // 啟動雲端即時同步監聽
+                            startRealtimeSync();
+                        } else {
+                            fallbackToLocalStorage();
+                        }
+                    });
+                } catch (err) {
+                    console.error("Firebase initialization failed, falling back to local:", err);
+                    fallbackToLocalStorage();
+                }
+            } else {
+                // 無 Firebase 配置，直接降級到 Local 模式
+                fallbackToLocalStorage();
             }
         }
 
-        // 從 LocalStorage 載入資料 (加上 try-catch 保護機制，避免沙盒環境報錯導致 JS 崩潰)
-        function loadFromLocalStorage() {
+        // 離線降級處理
+        function fallbackToLocalStorage() {
+            isCloudMode = false;
+            userUidDisplay.textContent = "OFFLINE-LOCAL-CLIENT";
+            syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> 本地離線模式`;
+            syncBadge.className = "bg-amber-950 text-amber-300 text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1 border border-amber-500/20";
+            connectionIndicator.innerHTML = `<i data-lucide="hard-drive" class="w-4 h-4 text-amber-400"></i> 資料將安全存儲在您這台電腦的瀏覽器中`;
+            
+            loadLocalData();
+            renderAll();
+        }
+
+        // 2. 本地資料管理 (LocalStorage + Safe Try-catch)
+        function loadLocalData() {
             try {
                 const storedTasks = localStorage.getItem("medical_bus_tasks");
                 const storedNotes = localStorage.getItem("medical_bus_notes");
 
-                if (storedTasks) {
-                    tasks = JSON.parse(storedTasks);
-                } else {
-                    tasks = JSON.parse(JSON.stringify(DEFAULT_TASKS)); // 深拷貝
-                }
-
-                if (storedNotes) {
-                    notes = JSON.parse(storedNotes);
-                } else {
-                    notes = JSON.parse(JSON.stringify(DEFAULT_NOTES));
-                }
+                tasks = storedTasks ? JSON.parse(storedTasks) : JSON.parse(JSON.stringify(DEFAULT_TASKS));
+                notes = storedNotes ? JSON.parse(storedNotes) : JSON.parse(JSON.stringify(DEFAULT_NOTES));
             } catch (e) {
-                console.warn("[本地存儲保護] 無法讀取 localStorage，改採記憶體機制(In-Memory)運作預設資料。", e);
+                console.warn("localStorage block detection, switching to safe RAM variables.", e);
                 tasks = JSON.parse(JSON.stringify(DEFAULT_TASKS));
                 notes = JSON.parse(JSON.stringify(DEFAULT_NOTES));
             }
         }
 
-        // Initialize Lucide icons
-        function updateIcons() {
-            lucide.createIcons();
-        }
-
-        // Custom Show Modal Dialog instead of alert()
-        function showCustomAlert(title, message, type = "success") {
-            const modal = document.getElementById("alert-modal");
-            const container = document.getElementById("alert-icon-container");
-            const icon = document.getElementById("alert-icon");
-            const t = document.getElementById("alert-title");
-            const m = document.getElementById("alert-message");
-
-            t.textContent = title;
-            m.textContent = message;
-
-            if (type === "success") {
-                container.className = "mx-auto w-12 h-12 rounded-full flex items-center justify-center bg-emerald-50 text-emerald-600";
-                icon.setAttribute("data-lucide", "check-circle");
-            } else if (type === "warning") {
-                container.className = "mx-auto w-12 h-12 rounded-full flex items-center justify-center bg-amber-50 text-amber-600";
-                icon.setAttribute("data-lucide", "alert-triangle");
-            } else {
-                container.className = "mx-auto w-12 h-12 rounded-full flex items-center justify-center bg-red-50 text-red-600";
-                icon.setAttribute("data-lucide", "x-circle");
+        function saveLocalData() {
+            try {
+                localStorage.setItem("medical_bus_tasks", JSON.stringify(tasks));
+                localStorage.setItem("medical_bus_notes", JSON.stringify(notes));
+            } catch (e) {
+                console.warn("Unable to save to localStorage:", e);
             }
-
-            modal.classList.remove("hidden");
-            updateIcons();
         }
 
-        document.getElementById("alert-btn-close").addEventListener("click", () => {
-            document.getElementById("alert-modal").classList.add("hidden");
-        });
+        // 3. 雲端即時同步訂閱 (遵循 Rule 1 & Rule 2: 嚴禁複合查詢)
+        function startRealtimeSync() {
+            if (!currentUser || !db) return;
 
-        // Calculate Project Days Left
+            // 嚴格遵守 Rule 1 路徑架構
+            const tasksRef = collection(db, 'artifacts', appId, 'public', 'data', 'tasks');
+            const notesRef = collection(db, 'artifacts', appId, 'public', 'data', 'notes');
+
+            // 監聽 Tasks
+            onSnapshot(tasksRef, (snapshot) => {
+                let tempTasks = [];
+                snapshot.forEach(doc => {
+                    tempTasks.push({ id: doc.id, ...doc.data() });
+                });
+
+                // 如果雲端尚未初始化，自動派發 (Seed) 16 項基礎 WBS 項目
+                if (tempTasks.length === 0) {
+                    seedDefaultDataToCloud();
+                } else {
+                    // 在記憶體中自行排序，嚴禁使用 Firestore 的 orderBy() 避免未建立索引報錯 (Rule 2)
+                    tempTasks.sort((a, b) => {
+                        if (a.phase !== b.phase) return a.phase - b.phase;
+                        return new Date(a.start) - new Date(b.start);
+                    });
+                    tasks = tempTasks;
+                    renderAll();
+                }
+            }, (error) => {
+                console.error("Firestore Tasks subscription failed:", error);
+            });
+
+            // 監聽 Notes
+            onSnapshot(notesRef, (snapshot) => {
+                let tempNotes = [];
+                snapshot.forEach(doc => {
+                    tempNotes.push({ id: doc.id, ...doc.data() });
+                });
+                tempNotes.sort((a, b) => new Date(b.date) - new Date(a.date)); // 內存降序排列
+                notes = tempNotes;
+                renderAll();
+            }, (error) => {
+                console.error("Firestore Notes subscription failed:", error);
+            });
+        }
+
+        // 初始化雲端專案資料
+        async function seedDefaultDataToCloud() {
+            if (!currentUser || !db) return;
+            const batch = writeBatch(db);
+            
+            // 寫入預設任務
+            DEFAULT_TASKS.forEach(t => {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tasks', t.id);
+                batch.set(docRef, {
+                    phase: t.phase,
+                    name: t.name,
+                    start: t.start,
+                    end: t.end,
+                    progress: t.progress,
+                    status: t.status,
+                    notes: t.notes
+                });
+            });
+
+            // 寫入預設備忘錄
+            DEFAULT_NOTES.forEach(n => {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'notes', n.id);
+                batch.set(docRef, {
+                    title: n.title,
+                    date: n.date,
+                    content: n.content,
+                    author: n.author
+                });
+            });
+
+            try {
+                await batch.commit();
+                console.log("Cloud default database seed completed.");
+            } catch (err) {
+                console.error("Failed to seed database:", err);
+            }
+        }
+
+        // 4. 新增、刪除、編輯任務資料核心邏輯 (雲端與本地自動路由)
+        async function updateTaskInDb(taskId, updatedData) {
+            if (isCloudMode && currentUser && db) {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tasks', taskId);
+                try {
+                    await updateDoc(docRef, updatedData);
+                } catch (err) {
+                    console.error("Cloud task update failed:", err);
+                }
+            } else {
+                const index = tasks.findIndex(t => t.id === taskId);
+                if (index > -1) {
+                    tasks[index] = { ...tasks[index], ...updatedData };
+                    saveLocalData();
+                    renderAll();
+                }
+            }
+        }
+
+        async function addTaskToDb(taskData) {
+            if (isCloudMode && currentUser && db) {
+                const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'tasks');
+                try {
+                    await addDoc(colRef, taskData);
+                } catch (err) {
+                    console.error("Cloud task addition failed:", err);
+                }
+            } else {
+                const newId = "t_" + Date.now();
+                tasks.push({ id: newId, ...taskData });
+                saveLocalData();
+                renderAll();
+            }
+        }
+
+        async function deleteTaskFromDb(taskId) {
+            if (isCloudMode && currentUser && db) {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tasks', taskId);
+                try {
+                    await deleteDoc(docRef);
+                } catch (err) {
+                    console.error("Cloud task deletion failed:", err);
+                }
+            } else {
+                tasks = tasks.filter(t => t.id !== taskId);
+                saveLocalData();
+                renderAll();
+            }
+        }
+
+        async function resetAllDataInDb() {
+            if (isCloudMode && currentUser && db) {
+                // 雲端重設：先把目前的通通刪除，再重新派發
+                const batch = writeBatch(db);
+                tasks.forEach(t => {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tasks', t.id);
+                    batch.delete(docRef);
+                });
+                notes.forEach(n => {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'notes', n.id);
+                    batch.delete(docRef);
+                });
+                try {
+                    await batch.commit();
+                    await seedDefaultDataToCloud();
+                    showCustomAlert("重設完畢", "雲端協作資料庫已一鍵重設至基準時程。");
+                } catch (err) {
+                    console.error("Failed to reset cloud database:", err);
+                }
+            } else {
+                localStorage.removeItem("medical_bus_tasks");
+                localStorage.removeItem("medical_bus_notes");
+                loadLocalData();
+                renderAll();
+                showCustomAlert("重設成功", "本地數據已重置回預設時程與備忘錄！");
+            }
+        }
+
+        // 5. 備忘錄操作
+        async function addNoteToDb(noteData) {
+            if (isCloudMode && currentUser && db) {
+                const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'notes');
+                try {
+                    await addDoc(colRef, noteData);
+                } catch (err) {
+                    console.error("Cloud note addition failed:", err);
+                }
+            } else {
+                const newId = "n_" + Date.now();
+                notes.unshift({ id: newId, ...noteData });
+                saveLocalData();
+                renderNotes();
+            }
+        }
+
+        async function deleteNoteFromDb(noteId) {
+            if (isCloudMode && currentUser && db) {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'notes', noteId);
+                try {
+                    await deleteDoc(docRef);
+                } catch (err) {
+                    console.error("Cloud note deletion failed:", err);
+                }
+            } else {
+                notes = notes.filter(n => n.id !== noteId);
+                saveLocalData();
+                renderNotes();
+            }
+        }
+
+        // 6. 頁面數據分析計算與 UI 渲染
         function calculateProjectMetrics() {
-            // Calculated based on current 2026/05/31 environment date
             const today = new Date("2026-05-31");
             const timeDiff = PROJECT_END.getTime() - today.getTime();
             const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
@@ -505,7 +773,6 @@
                 metricDaysLeft.innerHTML = `<i data-lucide="clock" class="w-3.5 h-3.5"></i> <span class="text-rose-600 font-bold text-sm">專案已逾期 ${Math.abs(daysLeft)} 天！</span>`;
             }
 
-            // Calculate overall progress weighted by task duration
             let totalWeight = 0;
             let weightedProgress = 0;
             let warningsCount = 0;
@@ -527,7 +794,7 @@
             metricProgressBar.style.width = `${overallPct}%`;
             metricWarnings.textContent = `${warningsCount} 項`;
 
-            // Update Milestones State based on specific task completion
+            // 更新里程碑
             milestones.forEach(m => {
                 const associatedTask = tasks.find(t => t.id === m.task);
                 if (associatedTask) {
@@ -540,16 +807,6 @@
             updateIcons();
         }
 
-        // Phase Colors for UI
-        const phaseColorMap = {
-            1: { bg: "bg-blue-500", text: "text-blue-500", lightBg: "bg-blue-50", hover: "hover:bg-blue-100", title: "一階段" },
-            2: { bg: "bg-indigo-500", text: "text-indigo-500", lightBg: "bg-indigo-50", hover: "hover:bg-indigo-100", title: "二階段" },
-            3: { bg: "bg-teal-500", text: "text-teal-500", lightBg: "bg-teal-50", hover: "hover:bg-teal-100", title: "三階段" },
-            4: { bg: "bg-purple-500", text: "text-purple-500", lightBg: "bg-purple-50", hover: "hover:bg-purple-100", title: "四階段" },
-            5: { bg: "bg-rose-500", text: "text-rose-500", lightBg: "bg-rose-50", hover: "hover:bg-rose-100", title: "五階段" }
-        };
-
-        // Render Task List
         function renderTaskList() {
             taskListBody.innerHTML = "";
             
@@ -564,7 +821,7 @@
                     <tr>
                         <td colspan="6" class="py-8 text-center text-slate-400 text-sm">
                             <i data-lucide="info" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
-                            本階段目前無任何管控任務。
+                            目前尚無任何改裝管控任務。
                         </td>
                     </tr>
                 `;
@@ -575,7 +832,6 @@
             filteredTasks.forEach(task => {
                 const phaseMeta = phaseColorMap[task.phase];
                 
-                // Set status badges
                 let statusBadge = "";
                 if (task.status === "Complete") {
                     statusBadge = `<span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-xs px-2.5 py-1 rounded-full font-bold">已完成</span>`;
@@ -615,10 +871,10 @@
                     <td class="py-4 px-4 text-center">${statusBadge}</td>
                     <td class="py-4 px-4 text-center">
                         <div class="flex items-center justify-center gap-1.5">
-                            <button onclick="editTask('${task.id}')" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-blue-600 transition-all" title="編輯項目">
+                            <button data-task-id="${task.id}" class="btn-edit-task p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-blue-600 transition-all" title="編輯項目">
                                 <i data-lucide="edit-3" class="w-4 h-4"></i>
                             </button>
-                            <button onclick="deleteTask('${task.id}')" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-rose-600 transition-all" title="刪除項目">
+                            <button data-task-id="${task.id}" class="btn-delete-task p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-rose-600 transition-all" title="刪除項目">
                                 <i data-lucide="trash-2" class="w-4 h-4"></i>
                             </button>
                         </div>
@@ -627,19 +883,24 @@
                 taskListBody.appendChild(tr);
             });
 
+            // 綁定動態生成的按鍵
+            document.querySelectorAll(".btn-edit-task").forEach(btn => {
+                btn.addEventListener("click", () => editTask(btn.dataset.taskId));
+            });
+            document.querySelectorAll(".btn-delete-task").forEach(btn => {
+                btn.addEventListener("click", () => deleteTask(btn.dataset.taskId));
+            });
+
             updateIcons();
         }
 
-        // Render Gantt Chart in purely responsive & visually pleasant HTML
-        // June, July, August 115 total 92 days.
         function renderGanttChart() {
             ganttContainer.innerHTML = "";
             const totalDays = 92;
             
-            // Build visual Timeline columns
             let headerHtml = `
                 <div class="min-w-[840px] flex border-b border-slate-100 pb-2 text-xs font-bold text-slate-400">
-                    <div class="w-64 flex-shrink-0 text-left">改裝管制項目 WBS</div>
+                    <div class="w-64 flex-shrink-0 text-left"> WBS 改裝管制項目</div>
                     <div class="flex-1 flex justify-between relative px-2">
                         <div class="text-left w-1/3">6月 (底盤與骨架)</div>
                         <div class="text-center w-1/3 border-l border-slate-100">7月 (內裝與特裝)</div>
@@ -655,14 +916,12 @@
                 const sDate = new Date(task.start);
                 const eDate = new Date(task.end);
                 
-                // Calculate position percentage inside 92 days period
                 const startDiff = (sDate.getTime() - PROJECT_START.getTime()) / (1000 * 3600 * 24);
                 const duration = Math.max(1, (eDate.getTime() - sDate.getTime()) / (1000 * 3600 * 24));
                 
                 const leftPercent = (startDiff / totalDays) * 100;
                 const widthPercent = (duration / totalDays) * 100;
 
-                // Set color for Gantt bars based on status
                 let barBg = phaseMeta.bg;
                 if (task.status === "Complete") {
                     barBg = "bg-emerald-500";
@@ -679,8 +938,7 @@
                             <span class="text-xs font-semibold text-slate-700 truncate" title="${task.name}">${task.name}</span>
                         </div>
                         <div class="flex-1 relative h-6 bg-slate-50 rounded-md">
-                            <!-- Gantt Timeline Bar -->
-                            <div class="absolute h-4 rounded-full ${barBg} top-1 shadow-sm transition-all flex items-center justify-end pr-1.5"
+                            <div class="absolute h-4 rounded-full ${barBg} top-1 shadow-sm transition-all flex items-center justify-end pr-1.5 animate-duration-1000"
                                  style="left: ${leftPercent}%; width: ${widthPercent}%;">
                                 <span class="text-[9px] font-black text-white leading-none">${task.progress}%</span>
                             </div>
@@ -693,7 +951,6 @@
             ganttContainer.innerHTML = headerHtml + rowsHtml;
         }
 
-        // Render Milestones Checklist
         function renderMilestones() {
             milestonesContainer.innerHTML = "";
             milestones.forEach(m => {
@@ -702,10 +959,9 @@
                 const bgIcon = isComplete ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-slate-50 text-slate-400 border-slate-100";
                 const iconName = isComplete ? "check" : "circle";
                 
-                // Overdue milestone check
                 const today = new Date("2026-05-31");
                 const [yearOffset, month, day] = m.date.split("/");
-                const absoluteYear = parseInt(yearOffset) === 115 ? 2026 : 2026;
+                const absoluteYear = 2026;
                 const mDate = new Date(`${absoluteYear}-${month}-${day}`);
                 const isOverdue = !isComplete && mDate < today;
 
@@ -732,7 +988,6 @@
             updateIcons();
         }
 
-        // Render Action Notes / Remarks
         function renderNotes() {
             notesContainer.innerHTML = "";
             if (notes.length === 0) {
@@ -744,7 +999,7 @@
                 const item = document.createElement("div");
                 item.className = "p-3.5 bg-slate-50 hover:bg-slate-100/70 border border-slate-100 rounded-xl transition-all relative group";
                 item.innerHTML = `
-                    <button onclick="deleteNote('${note.id}')" class="absolute top-2.5 right-2.5 p-1 text-slate-400 hover:text-rose-600 rounded opacity-0 group-hover:opacity-100 transition-opacity" title="刪除筆記">
+                    <button data-note-id="${note.id}" class="btn-delete-note absolute top-2.5 right-2.5 p-1 text-slate-400 hover:text-rose-600 rounded opacity-0 group-hover:opacity-100 transition-opacity" title="刪除筆記">
                         <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                     </button>
                     <h4 class="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
@@ -759,10 +1014,14 @@
                 `;
                 notesContainer.appendChild(item);
             });
+
+            document.querySelectorAll(".btn-delete-note").forEach(btn => {
+                btn.addEventListener("click", () => deleteNote(btn.dataset.noteId));
+            });
+
             updateIcons();
         }
 
-        // Format Dates beautifully
         function formatDate(dateStr) {
             const d = new Date(dateStr);
             const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -770,7 +1029,15 @@
             return `115/${mm}/${dd}`;
         }
 
-        // Set Filter Click Handlers
+        function renderAll() {
+            calculateProjectMetrics();
+            renderTaskList();
+            renderGanttChart();
+            renderMilestones();
+            renderNotes();
+        }
+
+        // 7. 互動事件綁定
         phaseFilters.addEventListener("click", (e) => {
             const btn = e.target.closest("button");
             if (!btn) return;
@@ -784,7 +1051,7 @@
             renderTaskList();
         });
 
-        // Add Task Modal Controls
+        // 任務表單控制彈窗
         const taskModal = document.getElementById("task-modal");
         const btnAddTask = document.getElementById("btn-add-task");
         const modalClose = document.getElementById("modal-close");
@@ -795,7 +1062,6 @@
             document.getElementById("modal-title").textContent = "新增管控任務";
             taskForm.reset();
             document.getElementById("form-task-id").value = "";
-            // Set defaults to start of project
             document.getElementById("form-task-start").value = "2026-06-01";
             document.getElementById("form-task-end").value = "2026-06-10";
             document.getElementById("form-task-progress").value = 0;
@@ -809,12 +1075,11 @@
         modalClose.addEventListener("click", closeModal);
         formBtnCancel.addEventListener("click", closeModal);
 
-        // Edit Task Logic
-        window.editTask = function(id) {
+        function editTask(id) {
             const task = tasks.find(t => t.id === id);
             if (!task) return;
 
-            document.getElementById("modal-title").textContent = "修改管控項目資訊";
+            document.getElementById("modal-title").textContent = "修改管制項目資訊";
             document.getElementById("form-task-id").value = task.id;
             document.getElementById("form-task-phase").value = task.phase;
             document.getElementById("form-task-name").value = task.name;
@@ -824,21 +1089,20 @@
             document.getElementById("form-task-status").value = task.status;
 
             taskModal.classList.remove("hidden");
-        };
+        }
 
-        // Delete Task Logic
-        window.deleteTask = function(id) {
-            const confirmed = confirm("確定要移除此改裝管控任務嗎？");
-            if (confirmed) {
-                tasks = tasks.filter(t => t.id !== id);
-                saveToLocalStorage(); // 儲存異動
-                renderAll();
-                showCustomAlert("刪除成功", "該項改裝管制任務已被移除並自動存檔。", "warning");
-            }
-        };
+        function deleteTask(id) {
+            showCustomConfirm(
+                "確認移除任務？", 
+                "確定要從雲端同步協作表中刪除此改裝任務？所有協作者畫面均會同步移除此項目。", 
+                async () => {
+                    await deleteTaskFromDb(id);
+                    showCustomAlert("刪除成功", "該項改裝管制任務已被移除並同步。");
+                }
+            );
+        }
 
-        // Form Submit Handler (Add or Update)
-        taskForm.addEventListener("submit", (e) => {
+        taskForm.addEventListener("submit", async (e) => {
             e.preventDefault();
             
             const id = document.getElementById("form-task-id").value;
@@ -849,32 +1113,25 @@
             const progress = parseInt(document.getElementById("form-task-progress").value);
             const status = document.getElementById("form-task-status").value;
 
-            // Date validation
             if (new Date(start) > new Date(end)) {
                 showCustomAlert("時程設定錯誤", "「開始日」不能大於「結束日」！", "error");
                 return;
             }
 
+            const taskData = { phase, name, start, end, progress, status };
+
             if (id) {
-                // Update
-                const taskIndex = tasks.findIndex(t => t.id === id);
-                if (taskIndex > -1) {
-                    tasks[taskIndex] = { ...tasks[taskIndex], phase, name, start, end, progress, status };
-                    showCustomAlert("儲存完畢", "已更新該項工程的施工進度與關鍵查驗條件，且已自動存檔。");
-                }
+                await updateTaskInDb(id, taskData);
+                showCustomAlert("儲存成功", "已同步更新雲端施工進度與關鍵查驗條件。");
             } else {
-                // Insert
-                const newId = "t_" + Date.now();
-                tasks.push({ id: newId, phase, name, start, end, progress, status });
-                showCustomAlert("新增完成", "成功將全新改裝工作項目匯入工程進度管理表中，且已自動存檔！");
+                await addTaskToDb(taskData);
+                showCustomAlert("新增完成", "成功將全新改裝工作項目匯入雲端即時控管表中！");
             }
 
-            saveToLocalStorage(); // 儲存異動
             closeModal();
-            renderAll();
         });
 
-        // Add Note Modal Controls
+        // 備忘錄表單
         const noteModal = document.getElementById("note-modal");
         const btnAddNote = document.getElementById("btn-add-note");
         const noteModalClose = document.getElementById("note-modal-close");
@@ -894,27 +1151,29 @@
         noteModalClose.addEventListener("click", closeNoteModal);
         noteBtnCancel.addEventListener("click", closeNoteModal);
 
-        noteForm.addEventListener("submit", (e) => {
+        noteForm.addEventListener("submit", async (e) => {
             e.preventDefault();
             const title = document.getElementById("form-note-title").value;
             const content = document.getElementById("form-note-content").value;
             const author = document.getElementById("form-note-author").value;
             const date = new Date().toISOString().split('T')[0];
 
-            notes.unshift({ id: "n_" + Date.now(), title, content, author, date });
-            saveToLocalStorage(); // 儲存異動
+            await addNoteToDb({ title, content, author, date });
             closeNoteModal();
-            renderNotes();
-            showCustomAlert("備忘已儲存", "查驗與改裝要求已成功匯入日誌，且已自動存檔。");
+            showCustomAlert("備忘已儲存", "查驗與改裝要求已成功上傳雲端協作日誌。");
         });
 
-        window.deleteNote = function(id) {
-            notes = notes.filter(n => n.id !== id);
-            saveToLocalStorage(); // 儲存異動
-            renderNotes();
-        };
+        function deleteNote(id) {
+            showCustomConfirm(
+                "確認移除備忘錄？", 
+                "您確定要刪除此筆查驗記錄？此動作將會對所有線上使用者即時同步刪除。", 
+                async () => {
+                    await deleteNoteFromDb(id);
+                }
+            );
+        }
 
-        // Export CSV Functionality (Simulated with text representation in prompt safe format)
+        // CSV 匯出
         document.getElementById("btn-export").addEventListener("click", () => {
             let csvContent = "\uFEFF階段,管制項目名稱,起迄日,進度,狀態\r\n";
             tasks.forEach(t => {
@@ -925,49 +1184,31 @@
             const link = document.createElement("a");
             const url = URL.createObjectURL(blob);
             link.setAttribute("href", url);
-            link.setAttribute("download", `行動醫療車改裝進度表_${new Date().toISOString().split('T')[0]}.csv`);
+            link.setAttribute("download", `智慧醫療車即時進度管控表_${new Date().toISOString().split('T')[0]}.csv`);
             link.style.visibility = "hidden";
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
         });
 
-        // Print page setup safely
         document.getElementById("btn-print").addEventListener("click", () => {
             window.print();
         });
 
-        // 「還原預設時程」按鈕動作
+        // 雲端資料庫一鍵重設
         document.getElementById("btn-reset").addEventListener("click", () => {
-            const confirmed = confirm("確定要將進度表重設回原廠預設時程範本嗎？這將會覆蓋您目前的修改。");
-            if (confirmed) {
-                try {
-                    // 清空 LocalStorage
-                    localStorage.removeItem("medical_bus_tasks");
-                    localStorage.removeItem("medical_bus_notes");
-                } catch (e) {
-                    console.warn("[本地存儲保護] 無法清除 localStorage:", e);
+            showCustomConfirm(
+                "確認重置雲端資料庫？", 
+                "這將會清除雲端資料庫目前的所有自訂修改，並重新載入官方標準 16 項醫療車改裝時程，所有正在線上的使用者將同時被更新。", 
+                async () => {
+                    await resetAllDataInDb();
                 }
-                // 重新載入初始資料
-                loadFromLocalStorage();
-                renderAll();
-                showCustomAlert("重設成功", "已成功還原成原始官方16項改裝時程表！", "success");
-            }
+            );
         });
 
-        // Global Render
-        function renderAll() {
-            calculateProjectMetrics();
-            renderTaskList();
-            renderGanttChart();
-            renderMilestones();
-            renderNotes();
-        }
-
-        // Load complete data initially
+        // 啟動點
         window.addEventListener("DOMContentLoaded", () => {
-            loadFromLocalStorage(); // 優先讀取 LocalStorage 數據
-            renderAll();
+            initApp();
         });
     </script>
 </body>
