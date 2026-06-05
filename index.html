@@ -493,7 +493,7 @@
         const syncBadge = document.getElementById("sync-badge");
         const githubPathDisplay = document.getElementById("github-path-display");
 
-        // Custom Confirm Dialogue Box (No Native Confirms)
+        // Custom Confirm Box (No Native Confirms)
         let activeConfirmCallback = null;
         function showCustomConfirm(title, message, callback) {
             const modal = document.getElementById("confirm-modal");
@@ -589,11 +589,31 @@
             }
         }
 
+        // 穩定的 UTF-8 Base64 編解碼器 (防範中文字元、大檔案及換行符號問題)
+        function decodeBase64Utf8(base64Str) {
+            // 先過濾所有的換行符號與空白
+            const cleanBase64 = base64Str.replace(/\s/g, '');
+            const binaryString = atob(cleanBase64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return new TextDecoder("utf-8").decode(bytes);
+        }
+
+        function encodeBase64Utf8(str) {
+            const bytes = new TextEncoder().encode(str);
+            let binaryString = "";
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binaryString += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binaryString);
+        }
+
         // 3. GitHub API 雙向對接核心 (Commit & Fetch JSON)
         async function pullDataFromGitHub() {
             const url = `https://api.github.com/repos/${gitConfig.owner}/${gitConfig.repo}/contents/${gitConfig.path}?ref=${gitConfig.branch}`;
             
-            // 使用更穩定的 Bearer 標頭，並自動去除 Token 前後空白
             const cleanToken = gitConfig.token.trim();
             const headers = {
                 "Accept": "application/vnd.github.v3+json",
@@ -612,23 +632,29 @@
                     notes = JSON.parse(JSON.stringify(DEFAULT_NOTES));
                     await pushDataToGitHub();
                     return;
+                } else if (response.status === 401) {
+                    throw new Error("GitHub 驗證失敗 (401)：請檢查您的個人存取權杖 (Token) 是否過期、已被撤銷，或權利不足。");
                 } else {
-                    throw new Error(`GitHub API 回報錯誤: ${response.statusText}`);
+                    throw new Error(`GitHub 讀取失敗 (${response.status})：${response.statusText}`);
                 }
             }
 
             const fileMeta = await response.json();
-            // 解析 Base64 編碼的 JSON 內容 (處理 UTF-8 多位元組中文字元)
-            const decodedContent = decodeURIComponent(escape(atob(fileMeta.content)));
-            const payload = JSON.parse(decodedContent);
+            
+            try {
+                // 使用升級版的 UTF-8 專用 Base64 解碼器
+                const decodedContent = decodeBase64Utf8(fileMeta.content);
+                const payload = JSON.parse(decodedContent);
 
-            if (payload && payload.tasks && payload.notes) {
-                tasks = payload.tasks;
-                notes = payload.notes;
-                // 在本機快取備份
-                saveLocalFallbackData();
-            } else {
-                throw new Error("GitHub JSON 格式不合規，未能讀取合適的專案進度。");
+                if (payload && payload.tasks && payload.notes) {
+                    tasks = payload.tasks;
+                    notes = payload.notes;
+                    saveLocalFallbackData(); // 本地緩存備份
+                } else {
+                    throw new Error("JSON 格式未包含 tasks 或 notes 進度欄位。");
+                }
+            } catch (err) {
+                throw new Error(`解析 GitHub JSON 檔案失敗，資料可能損壞：${err.message}`);
             }
         }
 
@@ -662,10 +688,10 @@
                 console.log("File is new, no SHA detected.");
             }
 
-            // 步驟 B: 打包進度，編譯為安全的 UTF-8 Base64
+            // 步驟 B: 打包進度，編譯為安全的 Base64
             const payload = { tasks, notes };
             const jsonString = JSON.stringify(payload, null, 2);
-            const base64Content = btoa(unescape(encodeURIComponent(jsonString)));
+            const base64Content = encodeBase64Utf8(jsonString);
 
             const commitMessage = `更新醫療巡迴車特裝進度與日誌: ${new Date().toLocaleString()}`;
             const body = {
@@ -684,7 +710,13 @@
 
             if (!putResponse.ok) {
                 const errorDetail = await putResponse.json();
-                throw new Error(errorDetail.message || "Push to GitHub failed");
+                if (putResponse.status === 401) {
+                    throw new Error("GitHub 寫入失敗 (401)：Token 權限無效。");
+                } else if (putResponse.status === 404) {
+                    throw new Error("GitHub 寫入失敗 (404)：找不到指定的分支或路徑。");
+                } else {
+                    throw new Error(errorDetail.message || `寫入失敗 (${putResponse.status})`);
+                }
             }
 
             console.log("GitHub commit completed successfully.");
@@ -1244,7 +1276,15 @@
                 const testRes = await fetch(testUrl, { headers });
 
                 if (!testRes.ok) {
-                    throw new Error("儲存庫不存在、帳號錯誤或 Token 權限不足（請確認權杖是否有勾選 `repo` 控制權限）。");
+                    if (testRes.status === 401) {
+                        throw new Error("GitHub 驗證失敗 (401 Unauthorized)：您的個人存取權杖 (Token) 無效或過期。請確認 Token 填寫正確且未被撤銷。");
+                    } else if (testRes.status === 404) {
+                        throw new Error("找不到儲存庫 (404 Not Found)：請檢查您的「帳號名稱」與「儲存庫名稱」是否拼寫正確。如果是私有儲存庫 (Private)，請確認您的 Token 具備 `repo` 存取權限。");
+                    } else if (testRes.status === 403) {
+                        throw new Error("拒絕存取 (403 Forbidden)：可能是 API 速率達到上限，或是 Token 權限不足。");
+                    } else {
+                        throw new Error(`連線失敗 (${testRes.status})：${testRes.statusText}`);
+                    }
                 }
 
                 // 通過驗證，寫入組態設定並儲存
@@ -1276,7 +1316,7 @@
                             <p><strong>常見原因與排除方式：</strong></p>
                             <ol class="list-decimal pl-4 space-y-1">
                                 <li><strong>您目前在 AI 的 Preview 預覽視窗內測試</strong>：瀏覽器會強制封鎖帶有 Authorization 標頭的跨網域請求。
-                                <br><span class="text-emerald-600 font-bold">➔ 解決方案：請下載檔案至您電腦本機雙擊開啟，或部署在 GitHub Pages 網址下測試，即可正常連線！</span></li>
+                                <br><span class="text-emerald-600 font-bold">➔ 解決方案：請將此網頁下載至您電腦本機雙擊開啟，或部署在 GitHub Pages 網址下測試，即可正常連線！</span></li>
                                 <li><strong>您的網路連線受限</strong>：公司防火牆或廣告攔截擴充功能（如 Brave Shield, uBlock）阻擋了 <code class="bg-slate-100 px-1 rounded text-red-500">api.github.com</code> 請求。</li>
                                 <li><strong>Token 金鑰含有非法換行符號或空白</strong>。</li>
                             </ol>
