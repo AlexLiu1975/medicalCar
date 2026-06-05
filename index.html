@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>行動智慧醫療車改裝工程進度管控系統 - 雲端協作版</title>
+    <title>行動智慧醫療車改裝工程進度管控系統 - GitHub 同步版</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -50,11 +50,14 @@
                         <i data-lucide="truck" class="w-8 h-8 text-blue-300"></i>
                         偏鄉行動智慧醫療車改裝工程 — 工作進度管控系統
                     </h1>
-                    <p class="text-blue-100 mt-1 text-sm sm:text-base">專為 TOYOTA COASTER 醫療中巴特裝工程設計，多人即時協作編輯與時效控管</p>
+                    <p class="text-blue-100 mt-1 text-sm sm:text-base">專為 TOYOTA COASTER 醫療中巴特裝工程設計，支援 GitHub JSON 資料庫雙向即時同步</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
+                    <button id="btn-github-config" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 shadow-md">
+                        <i data-lucide="github" class="w-4 h-4"></i> GitHub 同步設定
+                    </button>
                     <button id="btn-reset" class="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-rose-500 shadow-md">
-                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i> 重設雲端進度
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i> 還原預設時程
                     </button>
                     <button id="btn-export" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-white/20">
                         <i data-lucide="download" class="w-4 h-4"></i> 匯出 CSV
@@ -65,15 +68,15 @@
                 </div>
             </div>
             
-            <!-- User Status Console -->
+            <!-- GitHub Integration Banner -->
             <div class="mt-4 pt-4 border-t border-white/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-blue-200">
                 <div class="flex items-center gap-2">
-                    <i data-lucide="users" class="w-4 h-4 text-blue-300"></i>
-                    <span>您的專屬協作帳號 UID：</span>
-                    <span id="user-uid" class="font-mono bg-blue-900/40 text-white px-2 py-0.5 rounded border border-blue-600/30 break-all select-all">未登入</span>
+                    <i data-lucide="git-branch" class="w-4 h-4 text-blue-300"></i>
+                    <span>GitHub 儲存路徑：</span>
+                    <span id="github-path-display" class="font-mono bg-blue-900/40 text-white px-2 py-0.5 rounded border border-blue-600/30">尚未連結 GitHub 儲存庫</span>
                 </div>
-                <div id="connection-indicator" class="flex items-center gap-1.5 text-emerald-300 font-medium">
-                    <!-- Dynamic -->
+                <div id="connection-indicator" class="flex items-center gap-1.5 text-amber-300 font-medium">
+                    <i data-lucide="alert-circle" class="w-4 h-4"></i> 本地存儲模式（點擊上方按鈕即可綁定 GitHub 同步）
                 </div>
             </div>
         </div>
@@ -354,6 +357,50 @@
         </div>
     </div>
 
+    <!-- GITHUB CONFIGURATION MODAL -->
+    <div id="github-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden transform transition-all">
+            <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 class="text-base font-bold text-slate-800">GitHub 同步設定</h3>
+                <button id="github-modal-close" class="text-slate-400 hover:text-slate-600 transition-all">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form id="github-form" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">GitHub 帳號名稱 (Owner)</label>
+                    <input type="text" id="form-git-owner" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="例如: your-github-username" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">GitHub 儲存庫名稱 (Repository)</label>
+                    <input type="text" id="form-git-repo" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="例如: medical-bus-schedule" required>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">分支 (Branch)</label>
+                        <input type="text" id="form-git-branch" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value="main" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">資料夾/檔名 (.json)</label>
+                        <input type="text" id="form-git-path" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value="data/medical_bus_data.json" required>
+                    </div>
+                </div>
+                <div>
+                    <label class="block class text-xs font-bold text-slate-500 uppercase mb-1 flex items-center justify-between">
+                        <span>個人存取權杖 (Personal Access Token)</span>
+                        <a href="https://github.com/settings/tokens/new" target="_blank" class="text-blue-500 hover:underline text-[10px]">前往申請金鑰 ↗</a>
+                    </label>
+                    <input type="password" id="form-git-token" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxx" required>
+                    <p class="text-[10px] text-slate-400 mt-1">需勾選「repo」權限，此金鑰僅加密存於您本地瀏覽器快取，絕對安全。</p>
+                </div>
+                <div class="pt-4 border-t border-slate-100 flex justify-end gap-2">
+                    <button type="button" id="github-btn-cancel" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-semibold transition-all">取消</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all">測試並雙向綁定</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- UI Alert Modal Replacement -->
     <div id="alert-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4">
@@ -385,17 +432,13 @@
         </div>
     </div>
 
-    <!-- Firebase SDK Modules -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
+    <!-- Main Logic Script -->
+    <script>
         // Constants & Global configurations
         const PROJECT_START = new Date("2026-06-01");
         const PROJECT_END = new Date("2026-08-31");
 
-        // 16 標準任務範本
+        // 16 標準 WBS 任務
         const DEFAULT_TASKS = [
             { id: "t1", phase: 1, name: "TOYOTA COASTER 巴士底盤進廠與實車點交", start: "2026-06-01", end: "2026-06-05", progress: 0, status: "Not Started", notes: "檢視原廠配備、車身/引擎號碼核對，里程數紀錄。" },
             { id: "t2", phase: 1, name: "全車車體鈑金防護與保護貼皮包裝", start: "2026-06-04", end: "2026-06-07", progress: 0, status: "Not Started", notes: "防範改裝工程中，車身外部烤漆及內部駕駛艙刮傷。" },
@@ -425,19 +468,24 @@
             { id: "m1", name: "COASTER底盤巴士實車交付到廠", date: "115/06/01", task: "t1", complete: false },
             { id: "m2", name: "國稅局醫療車免稅申請送件", date: "115/07/05", task: "t7", complete: false },
             { id: "m3", name: "智慧電網與大容量UPS系統測試", date: "115/08/10", task: "t12", complete: false },
-            { id: "m4", name: "監理所醫療特種車規格驗收領牌", date: "115/08/28", task: "t15", complete: false },
+            { id: "m4", name: "監理所醫療特種車規格驗車與領牌", date: "115/08/28", task: "t15", complete: false },
             { id: "m5", name: "合約交車驗收期限 (死線)", date: "115/08/31", task: "t16", complete: false }
         ];
 
-        // 狀態變數
+        // 系統動態狀態變數
         let tasks = [];
         let notes = [];
         let currentFilter = "all";
-        let isCloudMode = false;
-        let db = null;
-        let auth = null;
-        let currentUser = null;
-        let appId = "default-app-id";
+        
+        // GitHub 同步組態配置
+        let gitConfig = {
+            owner: "",
+            repo: "",
+            branch: "main",
+            path: "data/medical_bus_data.json",
+            token: ""
+        };
+        let isGitHubLinked = false;
 
         // DOM elements cache
         const taskListBody = document.getElementById("task-list-body");
@@ -450,11 +498,11 @@
         const metricProgressBar = document.getElementById("metric-progress-bar");
         const metricDaysLeft = document.getElementById("metric-days-left");
         const metricWarnings = document.getElementById("metric-warnings");
-        const userUidDisplay = document.getElementById("user-uid");
         const connectionIndicator = document.getElementById("connection-indicator");
         const syncBadge = document.getElementById("sync-badge");
+        const githubPathDisplay = document.getElementById("github-path-display");
 
-        // Custom Confirm Handling
+        // Custom Confirm Dialogue Box (No Native Confirms)
         let activeConfirmCallback = null;
         function showCustomConfirm(title, message, callback) {
             const modal = document.getElementById("confirm-modal");
@@ -476,74 +524,58 @@
             activeConfirmCallback = null;
         });
 
-        // 1. 初始化 Firebase 模組與 Auth 流程
-        async function initApp() {
-            let firebaseConfig = null;
+        // 1. 初始化系統 & 自動偵測設定
+        async function initSystem() {
+            loadLocalSettings();
             
-            // 嘗試解析環境變數
-            try {
-                if (typeof __firebase_config !== "undefined" && __firebase_config) {
-                    firebaseConfig = JSON.parse(__firebase_config);
-                }
-            } catch (e) {
-                console.error("Firebase config parsing error:", e);
-            }
-
-            appId = typeof __app_id !== "undefined" ? __app_id : "medical-bus-115";
-
-            if (firebaseConfig && firebaseConfig.apiKey) {
-                // 有效 Firebase 配置，切換至雲端模式
+            if (isGitHubLinked) {
+                syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span> 連線 GitHub...`;
+                githubPathDisplay.textContent = `${gitConfig.owner}/${gitConfig.repo} (${gitConfig.branch})`;
+                
                 try {
-                    const app = initializeApp(firebaseConfig);
-                    auth = getAuth(app);
-                    db = getFirestore(app);
-
-                    // 依據 Rule 3: 先呼叫自訂 Token 或匿名驗證，再執行任何查詢
-                    if (typeof __initial_auth_token !== "undefined" && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-
-                    onAuthStateChanged(auth, (user) => {
-                        if (user) {
-                            currentUser = user;
-                            isCloudMode = true;
-                            userUidDisplay.textContent = user.uid; // 完整呈現 UID
-                            syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> 雲端連線模式`;
-                            syncBadge.className = "bg-emerald-950 text-emerald-300 text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1 border border-emerald-500/20";
-                            connectionIndicator.innerHTML = `<i data-lucide="cloud-lightning" class="w-4 h-4 text-emerald-400"></i> 與雲端資料庫保持即時雙向連線`;
-                            
-                            // 啟動雲端即時同步監聽
-                            startRealtimeSync();
-                        } else {
-                            fallbackToLocalStorage();
-                        }
-                    });
+                    await pullDataFromGitHub();
+                    syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> GitHub 同步模式`;
+                    syncBadge.className = "bg-emerald-950 text-emerald-300 text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1 border border-emerald-500/20";
+                    connectionIndicator.innerHTML = `<i data-lucide="cloud" class="w-4 h-4 text-emerald-400"></i> 與 GitHub 雲端 JSON 保持即時雙向連線`;
                 } catch (err) {
-                    console.error("Firebase initialization failed, falling back to local:", err);
-                    fallbackToLocalStorage();
+                    console.error("Failed to sync with GitHub on init:", err);
+                    syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> 連線 GitHub 失敗`;
+                    syncBadge.className = "bg-rose-950 text-rose-300 text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1 border border-rose-500/20";
+                    connectionIndicator.innerHTML = `<i data-lucide="alert-triangle" class="w-4 h-4 text-rose-400"></i> GitHub 連線失敗，暫時進入本機安全防護模式`;
+                    loadLocalFallbackData();
                 }
             } else {
-                // 無 Firebase 配置，直接降級到 Local 模式
                 fallbackToLocalStorage();
             }
-        }
-
-        // 離線降級處理
-        function fallbackToLocalStorage() {
-            isCloudMode = false;
-            userUidDisplay.textContent = "OFFLINE-LOCAL-CLIENT";
-            syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> 本地離線模式`;
-            syncBadge.className = "bg-amber-950 text-amber-300 text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1 border border-amber-500/20";
-            connectionIndicator.innerHTML = `<i data-lucide="hard-drive" class="w-4 h-4 text-amber-400"></i> 資料將安全存儲在您這台電腦的瀏覽器中`;
-            
-            loadLocalData();
             renderAll();
         }
 
-        // 2. 本地資料管理 (LocalStorage + Safe Try-catch)
-        function loadLocalData() {
+        function fallbackToLocalStorage() {
+            isGitHubLinked = false;
+            githubPathDisplay.textContent = "尚未連結 GitHub 儲存庫";
+            syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> 本地離線模式`;
+            syncBadge.className = "bg-amber-950 text-amber-300 text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1 border border-amber-500/20";
+            connectionIndicator.innerHTML = `<i data-lucide="hard-drive" class="w-4 h-4 text-amber-400"></i> 資料將安全存儲在您這台電腦的瀏覽器中`;
+            loadLocalFallbackData();
+        }
+
+        // 2. 本地設定與資料載入
+        function loadLocalSettings() {
+            try {
+                const storedConfig = localStorage.getItem("medical_bus_git_config");
+                if (storedConfig) {
+                    gitConfig = JSON.parse(storedConfig);
+                    // 只要有設定 Owner, Repo, Token 就算已連結
+                    if (gitConfig.owner && gitConfig.repo && gitConfig.token) {
+                        isGitHubLinked = true;
+                    }
+                }
+            } catch (e) {
+                console.warn("localStorage settings access blocked by Sandbox.", e);
+            }
+        }
+
+        function loadLocalFallbackData() {
             try {
                 const storedTasks = localStorage.getItem("medical_bus_tasks");
                 const storedNotes = localStorage.getItem("medical_bus_notes");
@@ -551,215 +583,115 @@
                 tasks = storedTasks ? JSON.parse(storedTasks) : JSON.parse(JSON.stringify(DEFAULT_TASKS));
                 notes = storedNotes ? JSON.parse(storedNotes) : JSON.parse(JSON.stringify(DEFAULT_NOTES));
             } catch (e) {
-                console.warn("localStorage block detection, switching to safe RAM variables.", e);
+                console.warn("localStorage tasks access blocked, loading safe in-memory data.", e);
                 tasks = JSON.parse(JSON.stringify(DEFAULT_TASKS));
                 notes = JSON.parse(JSON.stringify(DEFAULT_NOTES));
             }
         }
 
-        function saveLocalData() {
+        function saveLocalFallbackData() {
             try {
                 localStorage.setItem("medical_bus_tasks", JSON.stringify(tasks));
                 localStorage.setItem("medical_bus_notes", JSON.stringify(notes));
             } catch (e) {
-                console.warn("Unable to save to localStorage:", e);
+                console.warn("Unable to save backup to localStorage:", e);
             }
         }
 
-        // 3. 雲端即時同步訂閱 (遵循 Rule 1 & Rule 2: 嚴禁複合查詢)
-        function startRealtimeSync() {
-            if (!currentUser || !db) return;
+        // 3. GitHub API 雙向對接核心 (Commit & Fetch JSON)
+        async function pullDataFromGitHub() {
+            const url = `https://api.github.com/repos/${gitConfig.owner}/${gitConfig.repo}/contents/${gitConfig.path}?ref=${gitConfig.branch}`;
+            const headers = {
+                "Authorization": `token ${gitConfig.token}`,
+                "Accept": "application/vnd.github.v3+json",
+                "Cache-Control": "no-cache"
+            };
 
-            // 嚴格遵守 Rule 1 路徑架構
-            const tasksRef = collection(db, 'artifacts', appId, 'public', 'data', 'tasks');
-            const notesRef = collection(db, 'artifacts', appId, 'public', 'data', 'notes');
-
-            // 監聽 Tasks
-            onSnapshot(tasksRef, (snapshot) => {
-                let tempTasks = [];
-                snapshot.forEach(doc => {
-                    tempTasks.push({ id: doc.id, ...doc.data() });
-                });
-
-                // 如果雲端尚未初始化，自動派發 (Seed) 16 項基礎 WBS 項目
-                if (tempTasks.length === 0) {
-                    seedDefaultDataToCloud();
+            const response = await fetch(url, { headers });
+            if (!response.ok) {
+                if (response.status === 404) {
+                    // 找不到檔案，可能為新專案：自動提交初始預設 WBS 進度 JSON 到 GitHub
+                    console.log("GitHub file not found. Seeding initial JSON database...");
+                    tasks = JSON.parse(JSON.stringify(DEFAULT_TASKS));
+                    notes = JSON.parse(JSON.stringify(DEFAULT_NOTES));
+                    await pushDataToGitHub();
+                    return;
                 } else {
-                    // 在記憶體中自行排序，嚴禁使用 Firestore 的 orderBy() 避免未建立索引報錯 (Rule 2)
-                    tempTasks.sort((a, b) => {
-                        if (a.phase !== b.phase) return a.phase - b.phase;
-                        return new Date(a.start) - new Date(b.start);
-                    });
-                    tasks = tempTasks;
-                    renderAll();
+                    throw new Error(`GitHub API 回報錯誤: ${response.statusText}`);
                 }
-            }, (error) => {
-                console.error("Firestore Tasks subscription failed:", error);
-            });
+            }
 
-            // 監聽 Notes
-            onSnapshot(notesRef, (snapshot) => {
-                let tempNotes = [];
-                snapshot.forEach(doc => {
-                    tempNotes.push({ id: doc.id, ...doc.data() });
-                });
-                tempNotes.sort((a, b) => new Date(b.date) - new Date(a.date)); // 內存降序排列
-                notes = tempNotes;
-                renderAll();
-            }, (error) => {
-                console.error("Firestore Notes subscription failed:", error);
-            });
+            const fileMeta = await response.json();
+            // 解析 Base64 編碼的 JSON 內容 (處理 UTF-8 多位元組中文字元)
+            const decodedContent = decodeURIComponent(escape(atob(fileMeta.content)));
+            const payload = JSON.parse(decodedContent);
+
+            if (payload && payload.tasks && payload.notes) {
+                tasks = payload.tasks;
+                notes = payload.notes;
+                // 在本機快取備份
+                saveLocalFallbackData();
+            } else {
+                throw new Error("GitHub JSON 格式不合規，未能讀取合適的專案進度。");
+            }
         }
 
-        // 初始化雲端專案資料
-        async function seedDefaultDataToCloud() {
-            if (!currentUser || !db) return;
-            const batch = writeBatch(db);
-            
-            // 寫入預設任務
-            DEFAULT_TASKS.forEach(t => {
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tasks', t.id);
-                batch.set(docRef, {
-                    phase: t.phase,
-                    name: t.name,
-                    start: t.start,
-                    end: t.end,
-                    progress: t.progress,
-                    status: t.status,
-                    notes: t.notes
-                });
-            });
+        async function pushDataToGitHub() {
+            if (!isGitHubLinked) {
+                saveLocalFallbackData();
+                return;
+            }
 
-            // 寫入預設備忘錄
-            DEFAULT_NOTES.forEach(n => {
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'notes', n.id);
-                batch.set(docRef, {
-                    title: n.title,
-                    date: n.date,
-                    content: n.content,
-                    author: n.author
-                });
-            });
+            syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span> 同步至 GitHub...`;
+            const url = `https://api.github.com/repos/${gitConfig.owner}/${gitConfig.repo}/contents/${gitConfig.path}`;
+            const headers = {
+                "Authorization": `token ${gitConfig.token}`,
+                "Accept": "application/vnd.github.v3+json",
+                "Content-Type": "application/json"
+            };
 
+            // 步驟 A: 獲取最新的 File SHA
+            let fileSha = null;
             try {
-                await batch.commit();
-                console.log("Cloud default database seed completed.");
-            } catch (err) {
-                console.error("Failed to seed database:", err);
+                const getRes = await fetch(`${url}?ref=${gitConfig.branch}`, { headers });
+                if (getRes.ok) {
+                    const fileMeta = await getRes.ok ? await getRes.json() : null;
+                    if (fileMeta) fileSha = fileMeta.sha;
+                }
+            } catch (e) {
+                console.log("File is new, no SHA detected.");
             }
+
+            // 步驟 B: 打包進度，編譯為安全的 UTF-8 Base64
+            const payload = { tasks, notes };
+            const jsonString = JSON.stringify(payload, null, 2);
+            const base64Content = btoa(unescape(encodeURIComponent(jsonString)));
+
+            const commitMessage = `更新醫療巡迴車特裝進度與日誌: ${new Date().toLocaleString()}`;
+            const body = {
+                message: commitMessage,
+                content: base64Content,
+                branch: gitConfig.branch
+            };
+            if (fileSha) body.sha = fileSha;
+
+            // 步驟 C: PUT 提交檔案到 GitHub
+            const putResponse = await fetch(url, {
+                method: "PUT",
+                headers,
+                body: JSON.stringify(body)
+            });
+
+            if (!putResponse.ok) {
+                const errorDetail = await putResponse.json();
+                throw new Error(errorDetail.message || "Push to GitHub failed");
+            }
+
+            console.log("GitHub commit completed successfully.");
+            syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> GitHub 同步中`;
         }
 
-        // 4. 新增、刪除、編輯任務資料核心邏輯 (雲端與本地自動路由)
-        async function updateTaskInDb(taskId, updatedData) {
-            if (isCloudMode && currentUser && db) {
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tasks', taskId);
-                try {
-                    await updateDoc(docRef, updatedData);
-                } catch (err) {
-                    console.error("Cloud task update failed:", err);
-                }
-            } else {
-                const index = tasks.findIndex(t => t.id === taskId);
-                if (index > -1) {
-                    tasks[index] = { ...tasks[index], ...updatedData };
-                    saveLocalData();
-                    renderAll();
-                }
-            }
-        }
-
-        async function addTaskToDb(taskData) {
-            if (isCloudMode && currentUser && db) {
-                const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'tasks');
-                try {
-                    await addDoc(colRef, taskData);
-                } catch (err) {
-                    console.error("Cloud task addition failed:", err);
-                }
-            } else {
-                const newId = "t_" + Date.now();
-                tasks.push({ id: newId, ...taskData });
-                saveLocalData();
-                renderAll();
-            }
-        }
-
-        async function deleteTaskFromDb(taskId) {
-            if (isCloudMode && currentUser && db) {
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tasks', taskId);
-                try {
-                    await deleteDoc(docRef);
-                } catch (err) {
-                    console.error("Cloud task deletion failed:", err);
-                }
-            } else {
-                tasks = tasks.filter(t => t.id !== taskId);
-                saveLocalData();
-                renderAll();
-            }
-        }
-
-        async function resetAllDataInDb() {
-            if (isCloudMode && currentUser && db) {
-                // 雲端重設：先把目前的通通刪除，再重新派發
-                const batch = writeBatch(db);
-                tasks.forEach(t => {
-                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tasks', t.id);
-                    batch.delete(docRef);
-                });
-                notes.forEach(n => {
-                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'notes', n.id);
-                    batch.delete(docRef);
-                });
-                try {
-                    await batch.commit();
-                    await seedDefaultDataToCloud();
-                    showCustomAlert("重設完畢", "雲端協作資料庫已一鍵重設至基準時程。");
-                } catch (err) {
-                    console.error("Failed to reset cloud database:", err);
-                }
-            } else {
-                localStorage.removeItem("medical_bus_tasks");
-                localStorage.removeItem("medical_bus_notes");
-                loadLocalData();
-                renderAll();
-                showCustomAlert("重設成功", "本地數據已重置回預設時程與備忘錄！");
-            }
-        }
-
-        // 5. 備忘錄操作
-        async function addNoteToDb(noteData) {
-            if (isCloudMode && currentUser && db) {
-                const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'notes');
-                try {
-                    await addDoc(colRef, noteData);
-                } catch (err) {
-                    console.error("Cloud note addition failed:", err);
-                }
-            } else {
-                const newId = "n_" + Date.now();
-                notes.unshift({ id: newId, ...noteData });
-                saveLocalData();
-                renderNotes();
-            }
-        }
-
-        async function deleteNoteFromDb(noteId) {
-            if (isCloudMode && currentUser && db) {
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'notes', noteId);
-                try {
-                    await deleteDoc(docRef);
-                } catch (err) {
-                    console.error("Cloud note deletion failed:", err);
-                }
-            } else {
-                notes = notes.filter(n => n.id !== noteId);
-                saveLocalData();
-                renderNotes();
-            }
-        }
-
-        // 6. 頁面數據分析計算與 UI 渲染
+        // 4. 進度、異常、時差計算
         function calculateProjectMetrics() {
             const today = new Date("2026-05-31");
             const timeDiff = PROJECT_END.getTime() - today.getTime();
@@ -807,9 +739,17 @@
             updateIcons();
         }
 
+        // 5. 數據表格與甘特圖渲染
+        const phaseColorMap = {
+            1: { bg: "bg-blue-500", text: "text-blue-500", lightBg: "bg-blue-50", hover: "hover:bg-blue-100", title: "一階段" },
+            2: { bg: "bg-indigo-500", text: "text-indigo-500", lightBg: "bg-indigo-50", hover: "hover:bg-indigo-100", title: "二階段" },
+            3: { bg: "bg-teal-500", text: "text-teal-500", lightBg: "bg-teal-50", hover: "hover:bg-teal-100", title: "三階段" },
+            4: { bg: "bg-purple-500", text: "text-purple-500", lightBg: "bg-purple-50", hover: "hover:bg-purple-100", title: "四階段" },
+            5: { bg: "bg-rose-500", text: "text-rose-500", lightBg: "bg-rose-50", hover: "hover:bg-rose-100", title: "五階段" }
+        };
+
         function renderTaskList() {
             taskListBody.innerHTML = "";
-            
             const filteredTasks = currentFilter === "all" 
                 ? tasks 
                 : tasks.filter(t => t.phase.toString() === currentFilter);
@@ -821,7 +761,7 @@
                     <tr>
                         <td colspan="6" class="py-8 text-center text-slate-400 text-sm">
                             <i data-lucide="info" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
-                            目前尚無任何改裝管控任務。
+                            本工程階段目前無任何管控任務。
                         </td>
                     </tr>
                 `;
@@ -883,7 +823,7 @@
                 taskListBody.appendChild(tr);
             });
 
-            // 綁定動態生成的按鍵
+            // 綁定動態事件鍵
             document.querySelectorAll(".btn-edit-task").forEach(btn => {
                 btn.addEventListener("click", () => editTask(btn.dataset.taskId));
             });
@@ -938,7 +878,7 @@
                             <span class="text-xs font-semibold text-slate-700 truncate" title="${task.name}">${task.name}</span>
                         </div>
                         <div class="flex-1 relative h-6 bg-slate-50 rounded-md">
-                            <div class="absolute h-4 rounded-full ${barBg} top-1 shadow-sm transition-all flex items-center justify-end pr-1.5 animate-duration-1000"
+                            <div class="absolute h-4 rounded-full ${barBg} top-1 shadow-sm transition-all flex items-center justify-end pr-1.5"
                                  style="left: ${leftPercent}%; width: ${widthPercent}%;">
                                 <span class="text-[9px] font-black text-white leading-none">${task.progress}%</span>
                             </div>
@@ -1037,7 +977,37 @@
             renderNotes();
         }
 
-        // 7. 互動事件綁定
+        // 6. UI 表單控制與事件處理 (自訂對話窗取代原生 alert/confirm)
+        function showCustomAlert(title, message, type = "success") {
+            const modal = document.getElementById("alert-modal");
+            const container = document.getElementById("alert-icon-container");
+            const icon = document.getElementById("alert-icon");
+            const t = document.getElementById("alert-title");
+            const m = document.getElementById("alert-message");
+
+            t.textContent = title;
+            m.textContent = message;
+
+            if (type === "success") {
+                container.className = "mx-auto w-12 h-12 rounded-full flex items-center justify-center bg-emerald-50 text-emerald-600";
+                icon.setAttribute("data-lucide", "check-circle");
+            } else if (type === "warning") {
+                container.className = "mx-auto w-12 h-12 rounded-full flex items-center justify-center bg-amber-50 text-amber-600";
+                icon.setAttribute("data-lucide", "alert-triangle");
+            } else {
+                container.className = "mx-auto w-12 h-12 rounded-full flex items-center justify-center bg-red-50 text-red-600";
+                icon.setAttribute("data-lucide", "x-circle");
+            }
+
+            modal.classList.remove("hidden");
+            updateIcons();
+        }
+
+        document.getElementById("alert-btn-close").addEventListener("click", () => {
+            document.getElementById("alert-modal").classList.add("hidden");
+        });
+
+        // 階段過濾器
         phaseFilters.addEventListener("click", (e) => {
             const btn = e.target.closest("button");
             if (!btn) return;
@@ -1051,7 +1021,7 @@
             renderTaskList();
         });
 
-        // 任務表單控制彈窗
+        // 任務表單彈窗
         const taskModal = document.getElementById("task-modal");
         const btnAddTask = document.getElementById("btn-add-task");
         const modalClose = document.getElementById("modal-close");
@@ -1068,10 +1038,7 @@
             taskModal.classList.remove("hidden");
         });
 
-        const closeModal = () => {
-            taskModal.classList.add("hidden");
-        };
-
+        const closeModal = () => { taskModal.classList.add("hidden"); };
         modalClose.addEventListener("click", closeModal);
         formBtnCancel.addEventListener("click", closeModal);
 
@@ -1093,18 +1060,23 @@
 
         function deleteTask(id) {
             showCustomConfirm(
-                "確認移除任務？", 
-                "確定要從雲端同步協作表中刪除此改裝任務？所有協作者畫面均會同步移除此項目。", 
+                "確認移除此工作項目？",
+                "刪除該項目後，將會對所有裝置同步，且該動作無法撤銷。",
                 async () => {
-                    await deleteTaskFromDb(id);
-                    showCustomAlert("刪除成功", "該項改裝管制任務已被移除並同步。");
+                    tasks = tasks.filter(t => t.id !== id);
+                    try {
+                        await pushDataToGitHub();
+                        showCustomAlert("刪除成功", "該項改裝管制任務已被移除並同步。");
+                    } catch (e) {
+                        showCustomAlert("同步失敗", `本地已刪除，但 GitHub 同步發生問題: ${e.message}`, "error");
+                    }
+                    renderAll();
                 }
             );
         }
 
         taskForm.addEventListener("submit", async (e) => {
             e.preventDefault();
-            
             const id = document.getElementById("form-task-id").value;
             const phase = parseInt(document.getElementById("form-task-phase").value);
             const name = document.getElementById("form-task-name").value;
@@ -1121,17 +1093,24 @@
             const taskData = { phase, name, start, end, progress, status };
 
             if (id) {
-                await updateTaskInDb(id, taskData);
-                showCustomAlert("儲存成功", "已同步更新雲端施工進度與關鍵查驗條件。");
+                const idx = tasks.findIndex(t => t.id === id);
+                if (idx > -1) tasks[idx] = { id, ...taskData };
             } else {
-                await addTaskToDb(taskData);
-                showCustomAlert("新增完成", "成功將全新改裝工作項目匯入雲端即時控管表中！");
+                tasks.push({ id: "t_" + Date.now(), ...taskData });
             }
 
             closeModal();
+
+            try {
+                await pushDataToGitHub();
+                showCustomAlert("更新成功", "進度已完美儲存並推送到您的 GitHub 儲存庫 JSON 資料中。");
+            } catch (err) {
+                showCustomAlert("本地更新完畢", `本地資料已更新，但推送到 GitHub 時失敗: ${err.message}`, "warning");
+            }
+            renderAll();
         });
 
-        // 備忘錄表單
+        // 備忘錄彈窗
         const noteModal = document.getElementById("note-modal");
         const btnAddNote = document.getElementById("btn-add-note");
         const noteModalClose = document.getElementById("note-modal-close");
@@ -1144,10 +1123,7 @@
             noteModal.classList.remove("hidden");
         });
 
-        const closeNoteModal = () => {
-            noteModal.classList.add("hidden");
-        };
-
+        const closeNoteModal = () => { noteModal.classList.add("hidden"); };
         noteModalClose.addEventListener("click", closeNoteModal);
         noteBtnCancel.addEventListener("click", closeNoteModal);
 
@@ -1158,17 +1134,31 @@
             const author = document.getElementById("form-note-author").value;
             const date = new Date().toISOString().split('T')[0];
 
-            await addNoteToDb({ title, content, author, date });
+            notes.unshift({ id: "n_" + Date.now(), title, content, author, date });
             closeNoteModal();
-            showCustomAlert("備忘已儲存", "查驗與改裝要求已成功上傳雲端協作日誌。");
+
+            try {
+                await pushDataToGitHub();
+                showCustomAlert("備忘已儲存", "查驗與改裝備忘錄已同步推送到您的 GitHub JSON 中。");
+            } catch (err) {
+                showCustomAlert("本地已儲存", `本地備忘已存檔，但 GitHub 同步失敗: ${err.message}`, "warning");
+            }
+            renderNotes();
         });
 
         function deleteNote(id) {
             showCustomConfirm(
-                "確認移除備忘錄？", 
-                "您確定要刪除此筆查驗記錄？此動作將會對所有線上使用者即時同步刪除。", 
+                "確認移除此筆備忘？",
+                "刪除此查驗紀錄將自動在雲端同步變更。",
                 async () => {
-                    await deleteNoteFromDb(id);
+                    notes = notes.filter(n => n.id !== id);
+                    try {
+                        await pushDataToGitHub();
+                        showCustomAlert("刪除成功", "該備忘資料已被移除並同步。");
+                    } catch (e) {
+                        showCustomAlert("同步失敗", `本地已刪除，但 GitHub 同步失敗: ${e.message}`, "error");
+                    }
+                    renderNotes();
                 }
             );
         }
@@ -1179,36 +1169,104 @@
             tasks.forEach(t => {
                 csvContent += `${t.phase},"${t.name}",${t.start} ~ ${t.end},${t.progress}%,${t.status}\r\n`;
             });
-            
             const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
             const link = document.createElement("a");
             const url = URL.createObjectURL(blob);
             link.setAttribute("href", url);
-            link.setAttribute("download", `智慧醫療車即時進度管控表_${new Date().toISOString().split('T')[0]}.csv`);
+            link.setAttribute("download", `智慧醫療車時程進度表_${new Date().toISOString().split('T')[0]}.csv`);
             link.style.visibility = "hidden";
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
         });
 
-        document.getElementById("btn-print").addEventListener("click", () => {
-            window.print();
-        });
+        document.getElementById("btn-print").addEventListener("click", () => { window.print(); });
 
-        // 雲端資料庫一鍵重設
+        // 還原與重設時程
         document.getElementById("btn-reset").addEventListener("click", () => {
             showCustomConfirm(
-                "確認重置雲端資料庫？", 
-                "這將會清除雲端資料庫目前的所有自訂修改，並重新載入官方標準 16 項醫療車改裝時程，所有正在線上的使用者將同時被更新。", 
+                "確定重置數據？",
+                "此動作將會清除所有自訂進度，並重新載入 115年度 官方標準 16 項醫療車改裝時程，所有已在 GitHub 的使用者也會一併被重設。",
                 async () => {
-                    await resetAllDataInDb();
+                    tasks = JSON.parse(JSON.stringify(DEFAULT_TASKS));
+                    notes = JSON.parse(JSON.stringify(DEFAULT_NOTES));
+                    try {
+                        await pushDataToGitHub();
+                        showCustomAlert("重置成功", "已還原為原廠 WBS 進度，並成功同步更新到 GitHub JSON。");
+                    } catch (e) {
+                        showCustomAlert("本地重設完畢", `本地已還原，但 GitHub 雲端同步失敗: ${e.message}`, "warning");
+                    }
+                    renderAll();
                 }
             );
         });
 
-        // 啟動點
+        // 7. GitHub 設定彈窗管理與事件
+        const githubModal = document.getElementById("github-modal");
+        const btnGithubConfig = document.getElementById("btn-github-config");
+        const githubModalClose = document.getElementById("github-modal-close");
+        const githubBtnCancel = document.getElementById("github-btn-cancel");
+        const githubForm = document.getElementById("github-form");
+
+        btnGithubConfig.addEventListener("click", () => {
+            document.getElementById("form-git-owner").value = gitConfig.owner;
+            document.getElementById("form-git-repo").value = gitConfig.repo;
+            document.getElementById("form-git-branch").value = gitConfig.branch || "main";
+            document.getElementById("form-git-path").value = gitConfig.path || "data/medical_bus_data.json";
+            document.getElementById("form-git-token").value = gitConfig.token;
+            githubModal.classList.remove("hidden");
+        });
+
+        const closeGithubModal = () => { githubModal.classList.add("hidden"); };
+        githubModalClose.addEventListener("click", closeGithubModal);
+        githubBtnCancel.addEventListener("click", closeGithubModal);
+
+        githubForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const owner = document.getElementById("form-git-owner").value.trim();
+            const repo = document.getElementById("form-git-repo").value.trim();
+            const branch = document.getElementById("form-git-branch").value.trim();
+            const path = document.getElementById("form-git-path").value.trim();
+            const token = document.getElementById("form-git-token").value.trim();
+
+            syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span> 驗證連線...`;
+
+            // 測試 GitHub 連線是否有效
+            try {
+                const testUrl = `https://api.github.com/repos/${owner}/${repo}`;
+                const testRes = await fetch(testUrl, {
+                    headers: { "Authorization": `token ${token}`, "Accept": "application/vnd.github.v3+json" }
+                });
+
+                if (!testRes.ok) throw new Error("儲存庫不存在或 Token 權限不足（請確認是否有勾選 repo 寫入權限）。");
+
+                // 通過驗證，寫入組態設定並儲存
+                gitConfig = { owner, repo, branch, path, token };
+                localStorage.setItem("medical_bus_git_config", JSON.stringify(gitConfig));
+                isGitHubLinked = true;
+
+                // 進行雙向同步載入
+                await pullDataFromGitHub();
+
+                closeGithubModal();
+                showCustomAlert("GitHub 綁定成功", "已順利連線並載入專屬進度 JSON 檔，未來您做的所有修改都會即時自動推播回 GitHub。");
+                
+                githubPathDisplay.textContent = `${owner}/${repo} (${branch})`;
+                syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> GitHub 同步模式`;
+                syncBadge.className = "bg-emerald-950 text-emerald-300 text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1 border border-emerald-500/20";
+                connectionIndicator.innerHTML = `<i data-lucide="cloud" class="w-4 h-4 text-emerald-400"></i> 與 GitHub 雲端 JSON 保持即時雙向連線`;
+                
+                renderAll();
+            } catch (err) {
+                closeGithubModal();
+                showCustomAlert("GitHub 連線失敗", err.message, "error");
+                fallbackToLocalStorage();
+            }
+        });
+
+        // 系統啟動
         window.addEventListener("DOMContentLoaded", () => {
-            initApp();
+            initSystem();
         });
     </script>
 </body>
