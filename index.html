@@ -9,7 +9,7 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght=300;400;500;700;900&display=swap');
         body {
             font-family: 'Noto Sans TC', sans-serif;
             background-color: #f8fafc;
@@ -409,7 +409,7 @@
             </div>
             <div>
                 <h4 id="alert-title" class="text-base font-bold text-slate-800">提示</h4>
-                <p id="alert-message" class="text-sm text-slate-500 mt-1"></p>
+                <p id="alert-message" class="text-sm text-slate-500 mt-1 leading-relaxed"></p>
             </div>
             <button id="alert-btn-close" class="w-full bg-slate-950 hover:bg-slate-900 text-white py-2 rounded-xl text-sm font-semibold transition-all">確定</button>
         </div>
@@ -461,15 +461,6 @@
         const DEFAULT_NOTES = [
             { id: "n1", title: "簽約完成與工作準備會議", date: "2026-05-30", content: "雙方已於昨日完成正式簽約，合約價 570 萬元整。改裝廠特裝部總監表示已成功向總代理調度 COASTER 底盤，預計 115/06/01 按期進廠。", author: "總務處 詹專員" },
             { id: "n2", title: "貨物稅免稅申請重要提醒", date: "2026-05-31", content: "請會計室配合準備偏鄉公共衛生推廣計畫書，提供給改裝廠在 Phase 2 遞件國稅局申請免貨物稅。如規格未過，則依合約由學校代墊該項稅款。", author: "秘書室主任" }
-        ];
-
-        // 關鍵里程碑
-        const milestones = [
-            { id: "m1", name: "COASTER底盤巴士實車交付到廠", date: "115/06/01", task: "t1", complete: false },
-            { id: "m2", name: "國稅局醫療車免稅申請送件", date: "115/07/05", task: "t7", complete: false },
-            { id: "m3", name: "智慧電網與大容量UPS系統測試", date: "115/08/10", task: "t12", complete: false },
-            { id: "m4", name: "監理所醫療特種車規格驗車與領牌", date: "115/08/28", task: "t15", complete: false },
-            { id: "m5", name: "合約交車驗收期限 (死線)", date: "115/08/31", task: "t16", complete: false }
         ];
 
         // 系統動態狀態變數
@@ -601,11 +592,16 @@
         // 3. GitHub API 雙向對接核心 (Commit & Fetch JSON)
         async function pullDataFromGitHub() {
             const url = `https://api.github.com/repos/${gitConfig.owner}/${gitConfig.repo}/contents/${gitConfig.path}?ref=${gitConfig.branch}`;
+            
+            // 使用更穩定的 Bearer 標頭，並自動去除 Token 前後空白
+            const cleanToken = gitConfig.token.trim();
             const headers = {
-                "Authorization": `token ${gitConfig.token}`,
                 "Accept": "application/vnd.github.v3+json",
                 "Cache-Control": "no-cache"
             };
+            if (cleanToken) {
+                headers["Authorization"] = `Bearer ${cleanToken}`;
+            }
 
             const response = await fetch(url, { headers });
             if (!response.ok) {
@@ -644,18 +640,22 @@
 
             syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span> 同步至 GitHub...`;
             const url = `https://api.github.com/repos/${gitConfig.owner}/${gitConfig.repo}/contents/${gitConfig.path}`;
+            
+            const cleanToken = gitConfig.token.trim();
             const headers = {
-                "Authorization": `token ${gitConfig.token}`,
                 "Accept": "application/vnd.github.v3+json",
                 "Content-Type": "application/json"
             };
+            if (cleanToken) {
+                headers["Authorization"] = `Bearer ${cleanToken}`;
+            }
 
             // 步驟 A: 獲取最新的 File SHA
             let fileSha = null;
             try {
                 const getRes = await fetch(`${url}?ref=${gitConfig.branch}`, { headers });
                 if (getRes.ok) {
-                    const fileMeta = await getRes.ok ? await getRes.json() : null;
+                    const fileMeta = await getRes.json();
                     if (fileMeta) fileSha = fileMeta.sha;
                 }
             } catch (e) {
@@ -986,7 +986,7 @@
             const m = document.getElementById("alert-message");
 
             t.textContent = title;
-            m.textContent = message;
+            m.innerHTML = message; // 改用 innerHTML 以支援換行與鏈接提示
 
             if (type === "success") {
                 container.className = "mx-auto w-12 h-12 rounded-full flex items-center justify-center bg-emerald-50 text-emerald-600";
@@ -1234,11 +1234,18 @@
             // 測試 GitHub 連線是否有效
             try {
                 const testUrl = `https://api.github.com/repos/${owner}/${repo}`;
-                const testRes = await fetch(testUrl, {
-                    headers: { "Authorization": `token ${token}`, "Accept": "application/vnd.github.v3+json" }
-                });
+                
+                // 優雅降級測試：使用 Bearer 驗證並自動清除頭尾空白
+                const headers = { "Accept": "application/vnd.github.v3+json" };
+                if (token) {
+                    headers["Authorization"] = `Bearer ${token}`;
+                }
 
-                if (!testRes.ok) throw new Error("儲存庫不存在或 Token 權限不足（請確認是否有勾選 repo 寫入權限）。");
+                const testRes = await fetch(testUrl, { headers });
+
+                if (!testRes.ok) {
+                    throw new Error("儲存庫不存在、帳號錯誤或 Token 權限不足（請確認權杖是否有勾選 `repo` 控制權限）。");
+                }
 
                 // 通過驗證，寫入組態設定並儲存
                 gitConfig = { owner, repo, branch, path, token };
@@ -1259,7 +1266,26 @@
                 renderAll();
             } catch (err) {
                 closeGithubModal();
-                showCustomAlert("GitHub 連線失敗", err.message, "error");
+                
+                // 針對常見的 "Failed to fetch" (TypeError) 沙盒攔截與 CORS 進行特定提示
+                if (err instanceof TypeError || err.message.includes("Failed to fetch")) {
+                    showCustomAlert(
+                        "GitHub 連線失敗 (Failed to fetch)", 
+                        `<div class="text-left space-y-2 text-xs">
+                            <p class="font-bold text-rose-600">這是典型的「瀏覽器安全沙盒/跨網域攔截」錯誤！</p>
+                            <p><strong>常見原因與排除方式：</strong></p>
+                            <ol class="list-decimal pl-4 space-y-1">
+                                <li><strong>您目前在 AI 的 Preview 預覽視窗內測試</strong>：瀏覽器會強制封鎖帶有 Authorization 標頭的跨網域請求。
+                                <br><span class="text-emerald-600 font-bold">➔ 解決方案：請下載檔案至您電腦本機雙擊開啟，或部署在 GitHub Pages 網址下測試，即可正常連線！</span></li>
+                                <li><strong>您的網路連線受限</strong>：公司防火牆或廣告攔截擴充功能（如 Brave Shield, uBlock）阻擋了 <code class="bg-slate-100 px-1 rounded text-red-500">api.github.com</code> 請求。</li>
+                                <li><strong>Token 金鑰含有非法換行符號或空白</strong>。</li>
+                            </ol>
+                        </div>`, 
+                        "error"
+                    );
+                } else {
+                    showCustomAlert("GitHub 連線失敗", err.message, "error");
+                }
                 fallbackToLocalStorage();
             }
         });
