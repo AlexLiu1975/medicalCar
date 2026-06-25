@@ -3,1337 +3,1057 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>行動智慧醫療車改裝工程進度管控系統 - GitHub 同步版</title>
-    <!-- Tailwind CSS -->
+    <title>行動智慧醫療車改裝工程進度管控表</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Firebase Realtime Database (多人即時同步) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght=300;400;500;700;900&display=swap');
-        body {
-            font-family: 'Noto Sans TC', sans-serif;
-            background-color: #f8fafc;
-        }
-        /* Custom Scrollbar for Gantt Chart */
-        .gantt-scroll::-webkit-scrollbar {
-            height: 8px;
-            width: 8px;
-        }
-        .gantt-scroll::-webkit-scrollbar-track {
-            background: #f1f5f9;
-            border-radius: 4px;
-        }
-        .gantt-scroll::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 4px;
-        }
-        .gantt-scroll::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f8fafc; }
+        .custom-scroll::-webkit-scrollbar { height: 8px; width: 8px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        @keyframes row-flash { 0%,100%{background:transparent}50%{background:#dbeafe} }
+        .flash { animation: row-flash 1.2s ease-in-out; }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)} }
+        .fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        .online-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#22c55e; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
     </style>
 </head>
 <body class="text-slate-800 antialiased min-h-screen flex flex-col">
 
-    <!-- Header Section -->
-    <header class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white shadow-lg">
-        <div class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <div class="flex flex-wrap items-center gap-2 mb-2">
-                        <span class="bg-blue-500 text-white text-xs px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">專案管控</span>
-                        <span class="bg-emerald-500 text-white text-xs px-2.5 py-1 rounded-full font-bold">115年度偏鄉醫療計畫</span>
-                        <span id="sync-badge" class="bg-slate-600 text-white text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1">
-                            <span class="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse"></span> 初始化中...
-                        </span>
-                    </div>
-                    <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight flex items-center gap-3">
-                        <i data-lucide="truck" class="w-8 h-8 text-blue-300"></i>
-                        偏鄉行動智慧醫療車改裝工程 — 工作進度管控系統
-                    </h1>
-                    <p class="text-blue-100 mt-1 text-sm sm:text-base">專為 TOYOTA COASTER 醫療中巴特裝工程設計，支援 GitHub JSON 資料庫雙向即時同步</p>
+<!-- ───────── Firebase 設定提示 Banner ───────── -->
+<div id="firebase-banner" class="hidden bg-amber-50 border-b border-amber-200 px-4 py-3">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2 text-amber-800 text-sm">
+            <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500 flex-shrink-0"></i>
+            <span><strong>目前為單機模式</strong>，資料僅儲存在本機瀏覽器。要啟用多人即時同步，請</span>
+        </div>
+        <button onclick="showFirebaseModal()" class="bg-amber-500 hover:bg-amber-400 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1">
+            <i data-lucide="database" class="w-3.5 h-3.5"></i> 設定 Firebase 多人模式
+        </button>
+    </div>
+</div>
+
+<!-- ───────── Header ───────── -->
+<header class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 py-5 sm:px-6 lg:px-8">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+                <div class="flex items-center gap-2 mb-2 flex-wrap">
+                    <span class="bg-blue-500 text-white text-xs px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">進度管控</span>
+                    <span id="sync-badge" class="bg-slate-600 text-white text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block"></span> 單機模式
+                    </span>
+                    <!-- Online users -->
+                    <span id="online-count" class="hidden bg-emerald-600 text-white text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1">
+                        <span class="online-dot"></span> <span id="online-num">1</span> 人在線
+                    </span>
                 </div>
-                <div class="flex flex-wrap gap-2">
-                    <button id="btn-github-config" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 shadow-md">
-                        <i data-lucide="github" class="w-4 h-4"></i> GitHub 同步設定
-                    </button>
-                    <button id="btn-reset" class="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-rose-500 shadow-md">
-                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i> 還原預設時程
-                    </button>
-                    <button id="btn-export" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-white/20">
-                        <i data-lucide="download" class="w-4 h-4"></i> 匯出 CSV
-                    </button>
-                    <button id="btn-print" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 shadow-md">
-                        <i data-lucide="printer" class="w-4 h-4"></i> 列印管控表
-                    </button>
-                </div>
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight flex items-center gap-3">
+                    <i data-lucide="layout-dashboard" class="w-7 h-7 text-blue-300"></i>
+                    行動智慧醫療車改裝工程進度管控表
+                </h1>
+                <p class="text-blue-100 mt-1 text-sm">TOYOTA COASTER 醫療中巴特裝工程｜多人即時協作進度管理</p>
             </div>
-            
-            <!-- GitHub Integration Banner -->
-            <div class="mt-4 pt-4 border-t border-white/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-blue-200">
-                <div class="flex items-center gap-2">
-                    <i data-lucide="git-branch" class="w-4 h-4 text-blue-300"></i>
-                    <span>GitHub 儲存路徑：</span>
-                    <span id="github-path-display" class="font-mono bg-blue-900/40 text-white px-2 py-0.5 rounded border border-blue-600/30">尚未連結 GitHub 儲存庫</span>
+            <div class="flex flex-wrap gap-2 items-center">
+                <!-- Current user badge -->
+                <div id="user-badge" class="flex items-center gap-2 bg-white/10 border border-white/20 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-white/20 transition-all" onclick="promptUserName()">
+                    <div id="user-avatar" class="w-6 h-6 rounded-full bg-blue-400 flex items-center justify-center text-white text-xs font-black">?</div>
+                    <span id="user-name-display" class="text-sm font-semibold">點我設定名稱</span>
+                    <i data-lucide="edit-2" class="w-3.5 h-3.5 text-blue-200"></i>
                 </div>
-                <div id="connection-indicator" class="flex items-center gap-1.5 text-amber-300 font-medium">
-                    <i data-lucide="alert-circle" class="w-4 h-4"></i> 本地存儲模式（點擊上方按鈕即可綁定 GitHub 同步）
+                <button id="btn-export" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-white/20">
+                    <i data-lucide="download" class="w-4 h-4"></i> 匯出 CSV
+                </button>
+                <button id="btn-print" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 shadow-md">
+                    <i data-lucide="printer" class="w-4 h-4"></i> 列印
+                </button>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- ───────── Metrics Row ───────── -->
+<section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mt-6">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+            <div class="p-3 bg-blue-50 text-blue-600 rounded-xl flex-shrink-0">
+                <i data-lucide="activity" class="w-6 h-6"></i>
+            </div>
+            <div class="flex-1">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">整體進度</p>
+                <div class="flex items-baseline gap-2 mt-1">
+                    <span id="metric-progress" class="text-2xl font-black text-slate-800">0%</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-1.5 mt-2">
+                    <div id="metric-progress-bar" class="bg-blue-600 h-1.5 rounded-full transition-all duration-700" style="width:0%"></div>
                 </div>
             </div>
         </div>
-    </header>
-
-    <!-- Project Metrics Overview -->
-    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mt-6">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <!-- Overall Progress -->
-            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
-                    <i data-lucide="activity" class="w-6 h-6"></i>
-                </div>
-                <div class="flex-1">
-                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">整體工程進度</p>
-                    <div class="flex items-baseline gap-2 mt-1">
-                        <span id="metric-progress" class="text-2xl font-black text-slate-800">0%</span>
-                        <span class="text-xs text-slate-500">已落實</span>
-                    </div>
-                    <div class="w-full bg-slate-100 rounded-full h-1.5 mt-2">
-                        <div id="metric-progress-bar" class="bg-blue-600 h-1.5 rounded-full transition-all duration-500" style="width: 0%"></div>
-                    </div>
-                </div>
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+            <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl flex-shrink-0">
+                <i data-lucide="check-circle" class="w-6 h-6"></i>
             </div>
-
-            <!-- Time Left -->
-            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                <div class="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
-                    <i data-lucide="calendar" class="w-6 h-6"></i>
-                </div>
-                <div>
-                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">合約完工期限</p>
-                    <p class="text-xl font-bold text-slate-800 mt-1">115 / 08 / 31</p>
-                    <p id="metric-days-left" class="text-xs text-emerald-600 font-medium mt-1 flex items-center gap-1">
-                        <i data-lucide="clock" class="w-3.5 h-3.5"></i> 距離驗收還有 -- 天
-                    </p>
-                </div>
+            <div>
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">已完成</p>
+                <p id="metric-done" class="text-2xl font-black text-slate-800 mt-1">0 項</p>
+                <p class="text-xs text-slate-400 mt-1">共 <span id="metric-total">0</span> 項任務</p>
             </div>
-
-            <!-- Budget/Cost Status -->
-            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                <div class="p-3 bg-amber-50 text-amber-600 rounded-xl">
-                    <i data-lucide="dollar-sign" class="w-6 h-6"></i>
-                </div>
-                <div>
-                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">標案底價 / 決標價</p>
-                    <p class="text-xl font-bold text-slate-800 mt-1">NT$ 5,700,000</p>
-                    <p class="text-xs text-slate-500 mt-1">底盤比例：約 72.2% (411.6萬)</p>
-                </div>
+        </div>
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+            <div class="p-3 bg-indigo-50 text-indigo-600 rounded-xl flex-shrink-0">
+                <i data-lucide="loader" class="w-6 h-6"></i>
             </div>
+            <div>
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">進行中</p>
+                <p id="metric-inprogress" class="text-2xl font-black text-slate-800 mt-1">0 項</p>
+                <p class="text-xs text-slate-400 mt-1">執行中任務數</p>
+            </div>
+        </div>
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+            <div class="p-3 bg-rose-50 text-rose-600 rounded-xl flex-shrink-0">
+                <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">延遲警示</p>
+                <p id="metric-delayed" class="text-2xl font-black text-slate-800 mt-1">0 項</p>
+                <p class="text-xs text-slate-400 mt-1">需要立即追蹤</p>
+            </div>
+        </div>
+    </div>
+</section>
 
-            <!-- Warning Status -->
-            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                <div class="p-3 bg-red-50 text-red-600 rounded-xl">
-                    <i data-lucide="alert-triangle" class="w-6 h-6"></i>
-                </div>
-                <div>
-                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">異常與滯後項目</p>
-                    <p id="metric-warnings" class="text-xl font-bold text-slate-800 mt-1">0 項</p>
-                    <p class="text-xs text-slate-500 mt-1">雙週定期檢視機制運作中</p>
-                </div>
+<!-- ───────── Main Content ───────── -->
+<main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- Left: Task Management (8 cols) -->
+    <section class="lg:col-span-8 space-y-5">
+
+        <!-- Filter & Action Bar -->
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-1.5" id="status-filters">
+                <button class="filter-btn px-3 py-1.5 text-xs font-bold rounded-lg bg-blue-600 text-white transition-all" data-status="all">全部</button>
+                <button class="filter-btn px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:bg-slate-100 transition-all" data-status="Not Started">未開始</button>
+                <button class="filter-btn px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:bg-slate-100 transition-all" data-status="In Progress">進行中</button>
+                <button class="filter-btn px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:bg-slate-100 transition-all" data-status="Complete">已完成</button>
+                <button class="filter-btn px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:bg-slate-100 transition-all" data-status="Delayed">延遲</button>
+            </div>
+            <div class="flex items-center gap-2">
+                <input id="search-input" type="text" placeholder="搜尋任務或負責人..." class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400 w-44">
+                <button id="btn-add-task" class="bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i> 新增任務
+                </button>
+            </div>
+        </div>
+
+        <!-- Task Table -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <i data-lucide="list-todo" class="w-5 h-5 text-blue-600"></i>
+                    工作項目清單
+                </h2>
+                <span id="task-count-badge" class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md font-semibold">共 0 項</span>
+            </div>
+            <div class="overflow-x-auto custom-scroll">
+                <table class="w-full text-left border-collapse min-w-[700px]">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-100 text-slate-500 text-xs font-bold uppercase tracking-wider">
+                            <th class="py-3 px-4 w-8">#</th>
+                            <th class="py-3 px-4">任務名稱</th>
+                            <th class="py-3 px-4 w-24 text-center">負責人</th>
+                            <th class="py-3 px-4 w-28 text-center">起迄日</th>
+                            <th class="py-3 px-4 w-24 text-center">進度</th>
+                            <th class="py-3 px-4 w-24 text-center">狀態</th>
+                            <th class="py-3 px-4 w-16 text-center">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="task-table-body" class="divide-y divide-slate-100">
+                        <tr id="empty-row">
+                            <td colspan="7" class="py-12 text-center text-slate-400 text-sm">
+                                <i data-lucide="inbox" class="w-10 h-10 mx-auto mb-3 text-slate-300"></i>
+                                <p class="font-semibold">目前尚無任何工作任務</p>
+                                <p class="text-xs mt-1">點擊右上角「新增任務」開始建立</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </section>
 
-    <!-- Main Content Area -->
-    <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        <!-- Left Column: Controls & Task Management -->
-        <section class="lg:col-span-8 space-y-6">
-            <!-- Phase Filters & Action bar -->
-            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-wrap items-center justify-between gap-4">
-                <div class="flex flex-wrap items-center gap-1.5" id="phase-filters">
-                    <button class="filter-btn px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-blue-600 text-white" data-phase="all">全部階段</button>
-                    <button class="filter-btn px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:bg-slate-100 transition-all" data-phase="1">一階段</button>
-                    <button class="filter-btn px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:bg-slate-100 transition-all" data-phase="2">二階段</button>
-                    <button class="filter-btn px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:bg-slate-100 transition-all" data-phase="3">三階段</button>
-                    <button class="filter-btn px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:bg-slate-100 transition-all" data-phase="4">四階段</button>
-                    <button class="filter-btn px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:bg-slate-100 transition-all" data-phase="5">五階段</button>
-                </div>
-                
-                <button id="btn-add-task" class="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5">
-                    <i data-lucide="plus" class="w-3.5 h-3.5"></i> 新增管控任務
-                </button>
-            </div>
+    <!-- Right: Activity Log + Notes (4 cols) -->
+    <section class="lg:col-span-4 space-y-5">
 
-            <!-- Gantt / Timeline visualization -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                    <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
-                        <i data-lucide="bar-chart-3" class="w-5 h-5 text-indigo-600"></i>
-                        改裝進度甘特圖 (115年 6月 - 8月)
-                    </h2>
-                    <span class="text-xs text-slate-400">滑動可檢視完整區間</span>
-                </div>
-                <div class="p-6 overflow-x-auto gantt-scroll" id="gantt-container">
-                    <!-- Gantt Chart will be dynamically generated by JS -->
-                </div>
+        <!-- Real-time Activity Log -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+            <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+                <span class="flex items-center gap-2">
+                    <i data-lucide="zap" class="w-4 h-4 text-amber-500"></i>
+                    即時動態記錄
+                </span>
+                <button onclick="clearActivity()" class="text-[10px] text-slate-400 hover:text-rose-500 font-semibold transition-colors">清除</button>
+            </h3>
+            <div class="space-y-2.5 max-h-72 overflow-y-auto custom-scroll" id="activity-log">
+                <p class="text-xs text-slate-400 text-center py-4">等待使用者操作...</p>
             </div>
-
-            <!-- Task List Table -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                    <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
-                        <i data-lucide="list-todo" class="w-5 h-5 text-blue-600"></i>
-                        改裝工作分解結構與檢驗項目表
-                    </h2>
-                    <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md font-medium" id="task-count">載入中...</span>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-slate-50 border-b border-slate-100 text-slate-500 text-xs font-bold uppercase tracking-wider">
-                                <th class="py-3 px-4 w-12 text-center">階段</th>
-                                <th class="py-3 px-4">任務/改裝細節與查驗要點</th>
-                                <th class="py-3 px-4 w-28 text-center">預估起迄日</th>
-                                <th class="py-3 px-4 w-20 text-center">進度</th>
-                                <th class="py-3 px-4 w-28 text-center">狀態</th>
-                                <th class="py-3 px-4 w-12 text-center">操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="task-list-body" class="divide-y divide-slate-100">
-                            <!-- Tasks injected dynamically by JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
-
-        <!-- Right Column: Milestones, Notes, Risk Management -->
-        <section class="lg:col-span-4 space-y-6">
-            <!-- Critical Milestones Checklist -->
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <h3 class="text-base font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
-                    <i data-lucide="flag" class="w-5 h-5 text-amber-500"></i>
-                    關鍵里程碑 (Milestones)
-                </h3>
-                <div class="space-y-4" id="milestones-container">
-                    <!-- Milestones list injected dynamically -->
-                </div>
-            </div>
-
-            <!-- Project Risk Warning Panel -->
-            <div class="bg-gradient-to-br from-amber-50 to-orange-50 p-6 rounded-2xl border border-amber-100">
-                <h3 class="text-base font-bold text-amber-800 mb-2 flex items-center gap-2">
-                    <i data-lucide="shield-alert" class="w-5 h-5 text-amber-600"></i>
-                    改裝風險管控提示
-                </h3>
-                <ul class="space-y-2.5 text-xs text-amber-900 font-medium">
-                    <li class="flex gap-2">
-                        <span class="text-amber-500 mt-0.5">•</span>
-                        <span><strong>車身貨物稅免稅申請：</strong> 必須在 Phase 2 (7/5前) 完成文件彙整並向國稅局送件。若審核未通過，將會啟動校方代墊機制。</span>
-                    </li>
-                    <li class="flex gap-2">
-                        <span class="text-amber-500 mt-0.5">•</span>
-                        <span><strong>大功率電力線路隔離：</strong> 醫療設備（如超音波、離心機）需與原廠冷氣線路進行物理隔離，以防電壓起伏燒壞精密組件.</span>
-                    </li>
-                    <li class="flex gap-2">
-                        <span class="text-amber-500 mt-0.5">•</span>
-                        <span><strong>5級抗風車邊帳驗收：</strong> 車邊帳安裝完畢後，應在改裝廠區進行定點強風吹襲功能測試，確保結構無虞。</span>
-                    </li>
-                    <li class="flex gap-2">
-                        <span class="text-amber-500 mt-0.5">•</span>
-                        <span><strong>特種車檢驗：</strong> 預留至少 10 個工作天給監理所進行救護車/醫療車規格驗收，避免卡在領牌程序延誤完工。</span>
-                    </li>
-                </ul>
-            </div>
-
-            <!-- Action Log & Project Notes -->
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <div class="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
-                    <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
-                        <i data-lucide="notebook" class="w-5 h-5 text-slate-500"></i>
-                        查驗備忘錄
-                    </h3>
-                    <button id="btn-add-note" class="text-xs text-blue-600 font-bold hover:underline">新增筆記</button>
-                </div>
-                <div class="space-y-3 max-h-64 overflow-y-auto pr-1 gantt-scroll" id="notes-container">
-                    <!-- Notes injected dynamically -->
-                </div>
-            </div>
-        </section>
-    </main>
-
-    <!-- Footer -->
-    <footer class="bg-slate-900 text-slate-400 py-6 mt-12 border-t border-slate-800 text-center text-xs">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <p>© 115年度 偏鄉行動智慧醫療車改裝專案小組 研製. 所有進度內容具正式合約與多人在線同步效力。</p>
-            <p class="mt-1 text-slate-500">依據政府採購法、合約書規範、救護車特裝安全基準及變更檢驗標準編製</p>
         </div>
-    </footer>
 
-    <!-- ADD/EDIT TASK MODAL -->
-    <div id="task-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 overflow-hidden transform transition-all">
-            <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h3 id="modal-title" class="text-base font-bold text-slate-800">新增管控任務</h3>
-                <button id="modal-close" class="text-slate-400 hover:text-slate-600 transition-all">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
+        <!-- Online Users -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+            <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
+                <i data-lucide="users" class="w-4 h-4 text-emerald-500"></i>
+                目前在線成員
+            </h3>
+            <div id="online-users-list" class="space-y-2">
+                <p class="text-xs text-slate-400">未啟用多人模式</p>
             </div>
-            <form id="task-form" class="p-6 space-y-4">
-                <input type="hidden" id="form-task-id">
+        </div>
+
+        <!-- Notes -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+            <div class="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+                <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <i data-lucide="notebook" class="w-4 h-4 text-slate-500"></i>
+                    備忘筆記
+                </h3>
+                <button id="btn-add-note" class="text-xs text-blue-600 font-bold hover:underline">＋ 新增</button>
+            </div>
+            <div class="space-y-3 max-h-64 overflow-y-auto custom-scroll" id="notes-container">
+                <p class="text-xs text-slate-400 text-center py-4">尚無備忘筆記</p>
+            </div>
+        </div>
+    </section>
+</main>
+
+<!-- Footer -->
+<footer class="bg-slate-900 text-slate-400 py-5 mt-8 text-center text-xs">
+    <p>行動智慧醫療車改裝工程進度管控表 · 多人即時協作版</p>
+    <p class="mt-1 text-slate-500">資料同步由 Firebase Realtime Database 提供支援</p>
+</footer>
+
+<!-- ═══════════════ MODALS ═══════════════ -->
+
+<!-- Task Add/Edit Modal -->
+<div id="task-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 overflow-hidden">
+        <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 id="task-modal-title" class="text-base font-bold text-slate-800">新增工作任務</h3>
+            <button id="task-modal-close" class="text-slate-400 hover:text-slate-600">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <form id="task-form" class="p-6 space-y-4">
+            <input type="hidden" id="form-task-id">
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">任務名稱</label>
+                <input type="text" id="form-task-name" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="輸入任務名稱..." required>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">工程階段</label>
-                    <select id="form-task-phase" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                        <option value="1">第一階段：底盤點交與前置準備 (6/1 - 6/10)</option>
-                        <option value="2">第二階段：結構工程與智慧水電 (6/11 - 7/5)</option>
-                        <option value="3">第三階段：內裝裝潢與特裝設備 (7/6 - 7/31)</option>
-                        <option value="4">第四階段：醫療儀器與智慧系統整合 (8/1 - 8/15)</option>
-                        <option value="5">第五階段：全車塗裝、領牌與驗收 (8/16 - 8/31)</option>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">負責人</label>
+                    <input type="text" id="form-task-assignee" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="負責人姓名...">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">類別</label>
+                    <input type="text" id="form-task-category" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="例：網路、資安...">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">開始日期</label>
+                    <input type="date" id="form-task-start" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">結束日期</label>
+                    <input type="date" id="form-task-end" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">進度 (%)</label>
+                    <input type="number" id="form-task-progress" min="0" max="100" value="0" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">狀態</label>
+                    <select id="form-task-status" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="Not Started">未開始</option>
+                        <option value="In Progress">進行中</option>
+                        <option value="Complete">已完成</option>
+                        <option value="Delayed">延遲</option>
                     </select>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">任務名稱 / 改裝與查驗要點</label>
-                    <input type="text" id="form-task-name" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="請輸入任務名稱與具體說明..." required>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">預估開始日</label>
-                        <input type="date" id="form-task-start" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">預估結束日</label>
-                        <input type="date" id="form-task-end" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">目前進度 (%)</label>
-                        <input type="number" id="form-task-progress" min="0" max="100" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">工作狀態</label>
-                        <select id="form-task-status" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                            <option value="Not Started">未開始</option>
-                            <option value="In Progress">進行中</option>
-                            <option value="Complete">已完成</option>
-                            <option value="Delayed">進度延遲</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="pt-4 border-t border-slate-100 flex justify-end gap-2">
-                    <button type="button" id="form-btn-cancel" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-semibold transition-all">取消</button>
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all">儲存任務</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- NOTE MODAL -->
-    <div id="note-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden transform transition-all">
-            <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h3 class="text-base font-bold text-slate-800">新增查驗備忘</h3>
-                <button id="note-modal-close" class="text-slate-400 hover:text-slate-600 transition-all">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
-            </div>
-            <form id="note-form" class="p-6 space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">查驗主題 / 改裝組別</label>
-                    <input type="text" id="form-note-title" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="例如：水電線路查驗、冷氣測試..." required>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">查驗紀錄與待改善項目</label>
-                    <textarea id="form-note-content" rows="4" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="請詳述查驗結果與待改裝廠修正處..." required></textarea>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">查驗人員</label>
-                    <input type="text" id="form-note-author" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value="總務處專案小組" required>
-                </div>
-                <div class="pt-4 border-t border-slate-100 flex justify-end gap-2">
-                    <button type="button" id="note-btn-cancel" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-semibold transition-all">取消</button>
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all">儲存備忘</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- GITHUB CONFIGURATION MODAL -->
-    <div id="github-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden transform transition-all">
-            <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h3 class="text-base font-bold text-slate-800">GitHub 同步設定</h3>
-                <button id="github-modal-close" class="text-slate-400 hover:text-slate-600 transition-all">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
-            </div>
-            <form id="github-form" class="p-6 space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">GitHub 帳號名稱 (Owner)</label>
-                    <input type="text" id="form-git-owner" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="例如: your-github-username" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">GitHub 儲存庫名稱 (Repository)</label>
-                    <input type="text" id="form-git-repo" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="例如: medical-bus-schedule" required>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">分支 (Branch)</label>
-                        <input type="text" id="form-git-branch" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value="main" required>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">資料夾/檔名 (.json)</label>
-                        <input type="text" id="form-git-path" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value="data/medical_bus_data.json" required>
-                    </div>
-                </div>
-                <div>
-                    <label class="block class text-xs font-bold text-slate-500 uppercase mb-1 flex items-center justify-between">
-                        <span>個人存取權杖 (Personal Access Token)</span>
-                        <a href="https://github.com/settings/tokens/new" target="_blank" class="text-blue-500 hover:underline text-[10px]">前往申請金鑰 ↗</a>
-                    </label>
-                    <input type="password" id="form-git-token" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxx" required>
-                    <p class="text-[10px] text-slate-400 mt-1">需勾選「repo」權限，此金鑰僅加密存於您本地瀏覽器快取，絕對安全。</p>
-                </div>
-                <div class="pt-4 border-t border-slate-100 flex justify-end gap-2">
-                    <button type="button" id="github-btn-cancel" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-semibold transition-all">取消</button>
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all">測試並雙向綁定</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- UI Alert Modal Replacement -->
-    <div id="alert-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4">
-            <div id="alert-icon-container" class="mx-auto w-12 h-12 rounded-full flex items-center justify-center">
-                <i id="alert-icon" class="w-6 h-6"></i>
             </div>
             <div>
-                <h4 id="alert-title" class="text-base font-bold text-slate-800">提示</h4>
-                <p id="alert-message" class="text-sm text-slate-500 mt-1 leading-relaxed"></p>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">備註說明</label>
+                <textarea id="form-task-notes" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="補充說明..."></textarea>
             </div>
-            <button id="alert-btn-close" class="w-full bg-slate-950 hover:bg-slate-900 text-white py-2 rounded-xl text-sm font-semibold transition-all">確定</button>
+            <div class="pt-4 border-t border-slate-100 flex justify-end gap-2">
+                <button type="button" id="task-form-cancel" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-semibold">取消</button>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-xl text-sm font-semibold shadow-sm">儲存任務</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Note Modal -->
+<div id="note-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden">
+        <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="text-base font-bold text-slate-800">新增備忘筆記</h3>
+            <button id="note-modal-close" class="text-slate-400 hover:text-slate-600">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <form id="note-form" class="p-6 space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">標題</label>
+                <input type="text" id="form-note-title" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="筆記標題..." required>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">內容</label>
+                <textarea id="form-note-content" rows="4" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="詳細說明..." required></textarea>
+            </div>
+            <div class="pt-4 border-t border-slate-100 flex justify-end gap-2">
+                <button type="button" id="note-form-cancel" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-semibold">取消</button>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-xl text-sm font-semibold">儲存</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Firebase Config Modal -->
+<div id="firebase-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-100 overflow-hidden">
+        <div class="bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-4 flex items-center justify-between">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="flame" class="w-5 h-5"></i>
+                設定 Firebase 多人即時同步
+            </h3>
+            <button onclick="closeFirebaseModal()" class="text-white/70 hover:text-white">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <div class="p-6 space-y-5">
+            <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 text-xs text-blue-800 space-y-1.5">
+                <p class="font-bold text-sm">如何取得 Firebase 設定？</p>
+                <ol class="list-decimal list-inside space-y-1 text-blue-700">
+                    <li>前往 <strong>console.firebase.google.com</strong> 建立免費專案</li>
+                    <li>新增「Web 應用程式」</li>
+                    <li>啟用 <strong>Realtime Database</strong>（選測試模式）</li>
+                    <li>複製 firebaseConfig 物件貼入下方</li>
+                </ol>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Firebase Database URL</label>
+                <input type="url" id="fb-database-url" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-400" placeholder="https://your-project-default-rtdb.firebaseio.com">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">API Key</label>
+                <input type="text" id="fb-api-key" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-400" placeholder="AIzaSy...">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Project ID</label>
+                <input type="text" id="fb-project-id" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-400" placeholder="your-project-id">
+            </div>
+            <div class="bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs text-amber-800">
+                <strong>Database Rules（貼到 Firebase 控制台）：</strong>
+                <pre class="mt-1 font-mono">{ "rules": { ".read": true, ".write": true } }</pre>
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button onclick="closeFirebaseModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-semibold">取消</button>
+                <button onclick="applyFirebaseConfig()" class="bg-orange-500 hover:bg-orange-400 text-white px-5 py-2 rounded-xl text-sm font-semibold shadow-sm">連線 Firebase</button>
+            </div>
         </div>
     </div>
+</div>
 
-    <!-- CUSTOM CONFIRM MODAL -->
-    <div id="confirm-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-4">
-            <div class="mx-auto w-12 h-12 rounded-full flex items-center justify-center bg-rose-50 text-rose-600">
-                <i data-lucide="help-circle" class="w-6 h-6"></i>
-            </div>
-            <div class="text-center">
-                <h4 id="confirm-title" class="text-base font-bold text-slate-800">確認操作</h4>
-                <p id="confirm-message" class="text-sm text-slate-500 mt-1">您確定要執行此操作嗎？此動作將無法復原。</p>
-            </div>
-            <div class="flex gap-2">
-                <button id="confirm-btn-cancel" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-xl text-sm font-semibold transition-all">取消</button>
-                <button id="confirm-btn-action" class="flex-1 bg-rose-600 hover:bg-rose-500 text-white py-2 rounded-xl text-sm font-semibold transition-all">確定執行</button>
-            </div>
+<!-- User Name Modal -->
+<div id="username-modal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full shadow-2xl border border-slate-100 p-8 text-center space-y-5">
+        <div class="mx-auto w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center">
+            <i data-lucide="user" class="w-7 h-7 text-blue-600"></i>
         </div>
+        <div>
+            <h3 class="text-lg font-extrabold text-slate-800">你好！請輸入你的名稱</h3>
+            <p class="text-sm text-slate-400 mt-1">讓其他人知道是誰在更新進度</p>
+        </div>
+        <input type="text" id="username-input" maxlength="20" class="w-full text-center bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-base font-bold focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="輸入姓名或暱稱">
+        <button onclick="saveUserName()" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl text-sm font-bold shadow-sm transition-all">進入系統</button>
     </div>
+</div>
 
-    <!-- Main Logic Script -->
-    <script>
-        // Constants & Global configurations
-        const PROJECT_START = new Date("2026-06-01");
-        const PROJECT_END = new Date("2026-08-31");
+<!-- Alert Modal -->
+<div id="alert-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4">
+        <div id="alert-icon-wrap" class="mx-auto w-12 h-12 rounded-full flex items-center justify-center">
+            <i id="alert-icon" class="w-6 h-6"></i>
+        </div>
+        <div>
+            <h4 id="alert-title" class="text-base font-bold text-slate-800">提示</h4>
+            <p id="alert-msg" class="text-sm text-slate-500 mt-1"></p>
+        </div>
+        <button id="alert-close-btn" class="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-xl text-sm font-semibold">確定</button>
+    </div>
+</div>
 
-        // 16 標準 WBS 任務
-        const DEFAULT_TASKS = [
-            { id: "t1", phase: 1, name: "TOYOTA COASTER 巴士底盤進廠與實車點交", start: "2026-06-01", end: "2026-06-05", progress: 0, status: "Not Started", notes: "檢視原廠配備、車身/引擎號碼核對，里程數紀錄。" },
-            { id: "t2", phase: 1, name: "全車車體鈑金防護與保護貼皮包裝", start: "2026-06-04", end: "2026-06-07", progress: 0, status: "Not Started", notes: "防範改裝工程中，車身外部烤漆及內部駕駛艙刮傷。" },
-            { id: "t3", phase: 1, name: "原廠內裝/座椅拆卸工程與車底結構補強材料購置", start: "2026-06-06", end: "2026-06-10", progress: 0, status: "Not Started", notes: "將原座椅全數拆卸，採購高強度不銹鋼結構樑補強件。" },
-            { id: "t4", phase: 2, name: "車體骨架與智慧配電支撐網焊接工程", start: "2026-06-11", end: "2026-06-20", progress: 0, status: "Not Started", notes: "依據醫療櫃與超音波、診療椅配重，對大樑進行補強與架設骨架。" },
-            { id: "t5", phase: 2, name: "高壓電力線路/網路/醫療智慧訊號多軌鋪設", start: "2026-06-18", end: "2026-06-28", progress: 0, status: "Not Started", notes: "電線外部必須套上防火浪管。醫療訊號與AC電力線平行間距至少20cm防止干擾。" },
-            { id: "t6", phase: 2, name: "車體側面車邊帳安裝點結構強化與固定", start: "2026-06-26", end: "2026-07-02", progress: 0, status: "Not Started", notes: "高規防風手動車邊帳重負荷固定座焊接與防鏽處理。" },
-            { id: "t7", phase: 2, name: "向國稅局提交醫療巡迴車「免徵貨物稅」申請", start: "2026-06-25", end: "2026-07-05", progress: 0, status: "Not Started", notes: "整合合約、偏鄉計畫、設計圖，趕在此階段結束前送件，避免影響領牌。" },
-            { id: "t8", phase: 3, name: "車體高密度防震隔音棉與全車防火裝潢板封裝", start: "2026-07-06", end: "2026-07-15", progress: 0, status: "Not Started", notes: "確保車廂具備良好的冷房效果與高密度的隔音功能。" },
-            { id: "t9", phase: 3, name: "防滑防靜電高規格抗菌医疗級地板舖設", start: "2026-07-16", end: "2026-07-20", progress: 0, status: "Not Started", notes: "地板接口需熱熔接無縫處理，防水並利於日常消毒與血漬清理。" },
-            { id: "t10", phase: 3, name: "輕量化防震醫療櫃、病歷櫃與洗手槽配置安裝", start: "2026-07-21", end: "2026-07-31", progress: 0, status: "Not Started", notes: "櫃門配備防震自動彈鎖、防止行駛中櫃門開啟物品拋出。" },
-            { id: "t11", phase: 4, name: "多功能智慧微創診療床（或病床）底座強化鎖固", start: "2026-08-01", end: "2026-08-05", progress: 0, status: "Not Started", notes: "診療床底座直接鎖於車體補強樑，進行承重與升降電機測試。" },
-            { id: "t12", phase: 4, name: "車載智能UPS發電機系統與醫療冷氣系統測試", start: "2026-08-04", end: "2026-08-10", progress: 0, status: "Not Started", notes: "模擬停電狀態，測試鋰鐵電池組無縫接軌供電，醫療冷氣正常運轉2小時以上。" },
-            { id: "t13", phase: 4, name: "5G/Wi-Fi偏鄉智慧遠距會診多模通訊設備整合", start: "2026-08-09", end: "2026-08-15", progress: 0, status: "Not Started", notes: "與高醫大總院進行即時影像串流與病歷系統同步連線實測。" },
-            { id: "t14", phase: 5, name: "全車外部高醫大專屬識別彩繪噴漆烤漆", start: "2026-08-16", end: "2026-08-22", progress: 0, status: "Not Started", notes: "字體清晰醒目，具備行動智慧醫療車圖騰與偏鄉關懷字樣。" },
-            { id: "t15", phase: 5, name: "監理所特種醫療車規格驗車與領牌程序", start: "2026-08-20", end: "2026-08-28", progress: 0, status: "Not Started", notes: "送交車體變更證明，取得監理所核發之專用智慧醫療車牌照。" },
-            { id: "t16", phase: 5, name: "全案最終現場實車功能綜合驗收與交付", start: "2026-08-29", end: "2026-08-31", progress: 0, status: "Not Started", notes: "最後 30% 尾款請領，完成正式點交程序。" }
-        ];
+<script>
+// ══════════════════════════════════════════
+// CONFIG & STATE
+// ══════════════════════════════════════════
+const STORAGE_KEY = 'medical_car_progress_v1';
+let db = null;
+let currentUser = { name: '', color: '', id: '' };
+let tasks = [];
+let notes = [];
+let activityLogs = [];
+let currentFilter = 'all';
+let searchQuery = '';
+let isFirebaseMode = false;
 
-        const DEFAULT_NOTES = [
-            { id: "n1", title: "簽約完成與工作準備會議", date: "2026-05-30", content: "雙方已於昨日完成正式簽約，合約價 570 萬元整。改裝廠特裝部總監表示已成功向總代理調度 COASTER 底盤，預計 115/06/01 按期進廠。", author: "總務處 詹專員" },
-            { id: "n2", title: "貨物稅免稅申請重要提醒", date: "2026-05-31", content: "請會計室配合準備偏鄉公共衛生推廣計畫書，提供給改裝廠在 Phase 2 遞件國稅局申請免貨物稅。如規格未過，則依合約由學校代墊該項稅款。", author: "秘書室主任" }
-        ];
+// ── 預設任務（參考 index.html，首次無資料時自動寫入）──
+const DEFAULT_TASKS = [
+    { id:'t1',  category:'第一階段', name:'TOYOTA COASTER 巴士底盤進廠與實車點交',          assignee:'', start:'2026-06-01', end:'2026-06-05', progress:0, status:'Not Started', notes:'檢視原廠配備、車身/引擎號碼核對，里程數紀錄。' },
+    { id:'t2',  category:'第一階段', name:'全車車體鈑金防護與保護貼皮包裝',                  assignee:'', start:'2026-06-04', end:'2026-06-07', progress:0, status:'Not Started', notes:'防範改裝工程中，車身外部烤漆及內部駕駛艙刮傷。' },
+    { id:'t3',  category:'第一階段', name:'原廠內裝/座椅拆卸工程與車底結構補強材料購置',    assignee:'', start:'2026-06-06', end:'2026-06-10', progress:0, status:'Not Started', notes:'將原座椅全數拆卸，採購高強度不銹鋼結構樑補強件。' },
+    { id:'t4',  category:'第二階段', name:'車體骨架與智慧配電支撐網焊接工程',                assignee:'', start:'2026-06-11', end:'2026-06-20', progress:0, status:'Not Started', notes:'依據醫療櫃與超音波、診療椅配重，對大樑進行補強與架設骨架。' },
+    { id:'t5',  category:'第二階段', name:'高壓電力線路/網路/醫療智慧訊號多軌鋪設',         assignee:'', start:'2026-06-18', end:'2026-06-28', progress:0, status:'Not Started', notes:'電線外部必須套上防火浪管。醫療訊號與AC電力線平行間距至少20cm。' },
+    { id:'t6',  category:'第二階段', name:'車體側面車邊帳安裝點結構強化與固定',              assignee:'', start:'2026-06-26', end:'2026-07-02', progress:0, status:'Not Started', notes:'高規防風手動車邊帳重負荷固定座焊接與防鏽處理。' },
+    { id:'t7',  category:'第二階段', name:'向國稅局提交醫療巡迴車「免徵貨物稅」申請',        assignee:'', start:'2026-06-25', end:'2026-07-05', progress:0, status:'Not Started', notes:'整合合約、偏鄉計畫、設計圖，趕在此階段結束前送件，避免影響領牌。' },
+    { id:'t8',  category:'第三階段', name:'車體高密度防震隔音棉與全車防火裝潢板封裝',        assignee:'', start:'2026-07-06', end:'2026-07-15', progress:0, status:'Not Started', notes:'確保車廂具備良好的冷房效果與高密度的隔音功能。' },
+    { id:'t9',  category:'第三階段', name:'防滑防靜電高規格抗菌醫療級地板舖設',              assignee:'', start:'2026-07-16', end:'2026-07-20', progress:0, status:'Not Started', notes:'地板接口需熱熔接無縫處理，防水並利於日常消毒與血漬清理。' },
+    { id:'t10', category:'第三階段', name:'輕量化防震醫療櫃、病歷櫃與洗手槽配置安裝',        assignee:'', start:'2026-07-21', end:'2026-07-31', progress:0, status:'Not Started', notes:'櫃門配備防震自動彈鎖、防止行駛中櫃門開啟物品拋出。' },
+    { id:'t11', category:'第四階段', name:'多功能智慧微創診療床底座強化鎖固',                assignee:'', start:'2026-08-01', end:'2026-08-05', progress:0, status:'Not Started', notes:'診療床底座直接鎖於車體補強樑，進行承重與升降電機測試。' },
+    { id:'t12', category:'第四階段', name:'車載智能UPS發電機系統與醫療冷氣系統測試',         assignee:'', start:'2026-08-04', end:'2026-08-10', progress:0, status:'Not Started', notes:'模擬停電狀態，測試鋰鐵電池組無縫接軌供電，醫療冷氣正常運轉2小時以上。' },
+    { id:'t13', category:'第四階段', name:'5G/Wi-Fi偏鄉智慧遠距會診多模通訊設備整合',       assignee:'', start:'2026-08-09', end:'2026-08-15', progress:0, status:'Not Started', notes:'與高醫大總院進行即時影像串流與病歷系統同步連線實測。' },
+    { id:'t14', category:'第五階段', name:'全車外部高醫大專屬識別彩繪噴漆烤漆',              assignee:'', start:'2026-08-16', end:'2026-08-22', progress:0, status:'Not Started', notes:'字體清晰醒目，具備行動智慧醫療車圖騰與偏鄉關懷字樣。' },
+    { id:'t15', category:'第五階段', name:'監理所特種醫療車規格驗車與領牌程序',              assignee:'', start:'2026-08-20', end:'2026-08-28', progress:0, status:'Not Started', notes:'送交車體變更證明，取得監理所核發之專用智慧醫療車牌照。' },
+    { id:'t16', category:'第五階段', name:'全案最終現場實車功能綜合驗收與交付',              assignee:'', start:'2026-08-29', end:'2026-08-31', progress:0, status:'Not Started', notes:'最後30%尾款請領，完成正式點交程序。' }
+].map(t => ({ ...t, updatedBy: '系統預設', updatedAt: Date.now(), createdAt: Date.now() }));
 
-        // 系統動態狀態變數
-        let tasks = [];
-        let notes = [];
-        let currentFilter = "all";
-        
-        // GitHub 同步組態配置
-        let gitConfig = {
-            owner: "",
-            repo: "",
-            branch: "main",
-            path: "data/medical_bus_data.json",
-            token: ""
-        };
-        let isGitHubLinked = false;
+const STATUS_MAP = {
+    'Not Started': { label: '未開始', cls: 'bg-slate-50 text-slate-600' },
+    'In Progress': { label: '進行中', cls: 'bg-blue-50 text-blue-700' },
+    'Complete':    { label: '已完成', cls: 'bg-emerald-50 text-emerald-700' },
+    'Delayed':     { label: '延遲',   cls: 'bg-rose-50 text-rose-700' }
+};
 
-        // DOM elements cache
-        const taskListBody = document.getElementById("task-list-body");
-        const ganttContainer = document.getElementById("gantt-container");
-        const phaseFilters = document.getElementById("phase-filters");
-        const taskCount = document.getElementById("task-count");
-        const milestonesContainer = document.getElementById("milestones-container");
-        const notesContainer = document.getElementById("notes-container");
-        const metricProgress = document.getElementById("metric-progress");
-        const metricProgressBar = document.getElementById("metric-progress-bar");
-        const metricDaysLeft = document.getElementById("metric-days-left");
-        const metricWarnings = document.getElementById("metric-warnings");
-        const connectionIndicator = document.getElementById("connection-indicator");
-        const syncBadge = document.getElementById("sync-badge");
-        const githubPathDisplay = document.getElementById("github-path-display");
+const AVATAR_COLORS = ['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#ef4444','#06b6d4','#f97316'];
 
-        // Custom Confirm Box (No Native Confirms)
-        let activeConfirmCallback = null;
-        function showCustomConfirm(title, message, callback) {
-            const modal = document.getElementById("confirm-modal");
-            document.getElementById("confirm-title").textContent = title;
-            document.getElementById("confirm-message").textContent = message;
-            activeConfirmCallback = callback;
-            modal.classList.remove("hidden");
-            updateIcons();
+function randomColor() {
+    return AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
+}
+function initials(name) {
+    return name ? name.slice(0, 1).toUpperCase() : '?';
+}
+function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+function today() {
+    return new Date().toISOString().split('T')[0];
+}
+function nowStr() {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+// ══════════════════════════════════════════
+// USER IDENTITY
+// ══════════════════════════════════════════
+function loadUser() {
+    const saved = localStorage.getItem('wangyue_user');
+    if (saved) {
+        currentUser = JSON.parse(saved);
+        document.getElementById('username-modal').classList.add('hidden');
+        updateUserBadge();
+    }
+}
+
+function saveUserName() {
+    const name = document.getElementById('username-input').value.trim();
+    if (!name) return;
+    currentUser = { name, color: randomColor(), id: uid() };
+    localStorage.setItem('wangyue_user', JSON.stringify(currentUser));
+    document.getElementById('username-modal').classList.add('hidden');
+    updateUserBadge();
+    if (isFirebaseMode) registerPresence();
+}
+
+function promptUserName() {
+    document.getElementById('username-input').value = currentUser.name || '';
+    document.getElementById('username-modal').classList.remove('hidden');
+}
+
+function updateUserBadge() {
+    const avatar = document.getElementById('user-avatar');
+    avatar.textContent = initials(currentUser.name);
+    avatar.style.background = currentUser.color;
+    document.getElementById('user-name-display').textContent = currentUser.name || '點我設定名稱';
+}
+
+// ══════════════════════════════════════════
+// FIREBASE INTEGRATION
+// ══════════════════════════════════════════
+function showFirebaseModal() {
+    const saved = localStorage.getItem('wangyue_firebase');
+    if (saved) {
+        const cfg = JSON.parse(saved);
+        document.getElementById('fb-database-url').value = cfg.databaseURL || '';
+        document.getElementById('fb-api-key').value = cfg.apiKey || '';
+        document.getElementById('fb-project-id').value = cfg.projectId || '';
+    }
+    document.getElementById('firebase-modal').classList.remove('hidden');
+    lucide.createIcons();
+}
+
+function closeFirebaseModal() {
+    document.getElementById('firebase-modal').classList.add('hidden');
+}
+
+function applyFirebaseConfig() {
+    const databaseURL = document.getElementById('fb-database-url').value.trim();
+    const apiKey = document.getElementById('fb-api-key').value.trim();
+    const projectId = document.getElementById('fb-project-id').value.trim();
+
+    if (!databaseURL || !apiKey || !projectId) {
+        showAlert('缺少設定', '請填寫所有 Firebase 設定欄位', 'error');
+        return;
+    }
+
+    const config = { apiKey, databaseURL, projectId, authDomain: `${projectId}.firebaseapp.com` };
+    localStorage.setItem('wangyue_firebase', JSON.stringify(config));
+
+    try {
+        if (!firebase.apps.length) {
+            firebase.initializeApp(config);
         }
+        db = firebase.database();
+        isFirebaseMode = true;
+        closeFirebaseModal();
+        document.getElementById('firebase-banner').classList.add('hidden');
+        updateSyncBadge(true);
+        subscribeFirebase();
+        registerPresence();
+        showAlert('連線成功', '已啟用 Firebase 多人即時同步！', 'success');
+    } catch (err) {
+        showAlert('連線失敗', `Firebase 初始化失敗：${err.message}`, 'error');
+    }
+}
 
-        document.getElementById("confirm-btn-cancel").addEventListener("click", () => {
-            document.getElementById("confirm-modal").classList.add("hidden");
-            activeConfirmCallback = null;
+function tryAutoConnectFirebase() {
+    const saved = localStorage.getItem('wangyue_firebase');
+    if (!saved) return;
+    try {
+        const config = JSON.parse(saved);
+        if (!firebase.apps.length) firebase.initializeApp(config);
+        db = firebase.database();
+        isFirebaseMode = true;
+        updateSyncBadge(true);
+        subscribeFirebase();
+        registerPresence();
+        document.getElementById('firebase-banner').classList.add('hidden');
+    } catch (e) {
+        console.warn('Firebase auto-connect failed:', e);
+    }
+}
+
+function subscribeFirebase() {
+    // Tasks — 首次空資料庫自動寫入預設任務
+    db.ref('tasks').once('value', snap => {
+        if (!snap.val()) {
+            const batch = {};
+            DEFAULT_TASKS.forEach(t => { batch[t.id] = t; });
+            db.ref('tasks').set(batch);
+        }
+    });
+    db.ref('tasks').on('value', snap => {
+        const data = snap.val() || {};
+        tasks = Object.values(data).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+        saveLocal();
+        renderAll();
+    });
+    // Notes
+    db.ref('notes').on('value', snap => {
+        const data = snap.val() || {};
+        notes = Object.values(data).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        renderNotes();
+    });
+    // Activity
+    db.ref('activity').limitToLast(30).on('value', snap => {
+        const data = snap.val() || {};
+        activityLogs = Object.values(data).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+        renderActivity();
+    });
+    // Presence
+    db.ref('presence').on('value', snap => {
+        const data = snap.val() || {};
+        const users = Object.values(data).filter(u => Date.now() - (u.lastSeen || 0) < 30000);
+        updateOnlineUsers(users);
+    });
+}
+
+function registerPresence() {
+    if (!db || !currentUser.name) return;
+    const ref = db.ref(`presence/${currentUser.id}`);
+    const data = { name: currentUser.name, color: currentUser.color, lastSeen: Date.now() };
+    ref.set(data);
+    ref.onDisconnect().remove();
+    setInterval(() => ref.update({ lastSeen: Date.now() }), 15000);
+}
+
+function updateOnlineUsers(users) {
+    const list = document.getElementById('online-users-list');
+    const countEl = document.getElementById('online-count');
+    const numEl = document.getElementById('online-num');
+
+    if (users.length === 0) {
+        list.innerHTML = '<p class="text-xs text-slate-400">目前無人在線</p>';
+        countEl.classList.add('hidden');
+        return;
+    }
+
+    countEl.classList.remove('hidden');
+    numEl.textContent = users.length;
+
+    list.innerHTML = users.map(u => `
+        <div class="flex items-center gap-2.5 py-1">
+            <div class="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-black flex-shrink-0" style="background:${u.color || '#3b82f6'}">
+                ${initials(u.name)}
+            </div>
+            <span class="text-sm font-semibold text-slate-700">${u.name}</span>
+            <span class="online-dot ml-auto"></span>
+        </div>
+    `).join('');
+}
+
+function logActivity(msg) {
+    const entry = { msg, user: currentUser.name || '匿名', ts: Date.now(), time: nowStr(), id: uid() };
+    if (isFirebaseMode && db) {
+        db.ref(`activity/${entry.id}`).set(entry);
+        // Keep only latest 100
+        db.ref('activity').once('value', snap => {
+            const data = snap.val() || {};
+            const keys = Object.keys(data).sort();
+            if (keys.length > 100) keys.slice(0, keys.length - 100).forEach(k => db.ref(`activity/${k}`).remove());
         });
+    } else {
+        activityLogs.unshift(entry);
+        if (activityLogs.length > 30) activityLogs = activityLogs.slice(0, 30);
+        renderActivity();
+    }
+}
 
-        document.getElementById("confirm-btn-action").addEventListener("click", () => {
-            if (activeConfirmCallback) activeConfirmCallback();
-            document.getElementById("confirm-modal").classList.add("hidden");
-            activeConfirmCallback = null;
-        });
+function clearActivity() {
+    activityLogs = [];
+    if (isFirebaseMode && db) db.ref('activity').remove();
+    renderActivity();
+}
 
-        // 1. 初始化系統 & 自動偵測設定
-        async function initSystem() {
-            loadLocalSettings();
-            
-            if (isGitHubLinked) {
-                syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span> 連線 GitHub...`;
-                githubPathDisplay.textContent = `${gitConfig.owner}/${gitConfig.repo} (${gitConfig.branch})`;
-                
-                try {
-                    await pullDataFromGitHub();
-                    syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> GitHub 同步模式`;
-                    syncBadge.className = "bg-emerald-950 text-emerald-300 text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1 border border-emerald-500/20";
-                    connectionIndicator.innerHTML = `<i data-lucide="cloud" class="w-4 h-4 text-emerald-400"></i> 與 GitHub 雲端 JSON 保持即時雙向連線`;
-                } catch (err) {
-                    console.error("Failed to sync with GitHub on init:", err);
-                    syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> 連線 GitHub 失敗`;
-                    syncBadge.className = "bg-rose-950 text-rose-300 text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1 border border-rose-500/20";
-                    connectionIndicator.innerHTML = `<i data-lucide="alert-triangle" class="w-4 h-4 text-rose-400"></i> GitHub 連線失敗，暫時進入本機安全防護模式`;
-                    loadLocalFallbackData();
-                }
-            } else {
-                fallbackToLocalStorage();
-            }
-            renderAll();
-        }
+function updateSyncBadge(online) {
+    const badge = document.getElementById('sync-badge');
+    if (online) {
+        badge.className = 'bg-emerald-600 text-white text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1';
+        badge.innerHTML = '<span class="online-dot"></span> Firebase 即時同步';
+    } else {
+        badge.className = 'bg-slate-600 text-white text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1';
+        badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block"></span> 單機模式';
+    }
+}
 
-        function fallbackToLocalStorage() {
-            isGitHubLinked = false;
-            githubPathDisplay.textContent = "尚未連結 GitHub 儲存庫";
-            syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> 本地離線模式`;
-            syncBadge.className = "bg-amber-950 text-amber-300 text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1 border border-amber-500/20";
-            connectionIndicator.innerHTML = `<i data-lucide="hard-drive" class="w-4 h-4 text-amber-400"></i> 資料將安全存儲在您這台電腦的瀏覽器中`;
-            loadLocalFallbackData();
-        }
+// ══════════════════════════════════════════
+// LOCAL STORAGE
+// ══════════════════════════════════════════
+function saveLocal() {
+    if (!isFirebaseMode) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, notes }));
+    }
+}
 
-        // 2. 本地設定與資料載入
-        function loadLocalSettings() {
-            try {
-                const storedConfig = localStorage.getItem("medical_bus_git_config");
-                if (storedConfig) {
-                    gitConfig = JSON.parse(storedConfig);
-                    // 只要有設定 Owner, Repo, Token 就算已連結
-                    if (gitConfig.owner && gitConfig.repo && gitConfig.token) {
-                        isGitHubLinked = true;
-                    }
-                }
-            } catch (e) {
-                console.warn("localStorage settings access blocked by Sandbox.", e);
-            }
-        }
+function loadLocal() {
+    const data = localStorage.getItem(STORAGE_KEY);
+    if (data) {
+        const p = JSON.parse(data);
+        tasks = p.tasks || [];
+        notes = p.notes || [];
+    } else {
+        tasks = DEFAULT_TASKS.map(t => ({ ...t }));
+        saveLocal();
+    }
+}
 
-        function loadLocalFallbackData() {
-            try {
-                const storedTasks = localStorage.getItem("medical_bus_tasks");
-                const storedNotes = localStorage.getItem("medical_bus_notes");
+// ══════════════════════════════════════════
+// TASK CRUD
+// ══════════════════════════════════════════
+function saveTask(task) {
+    if (isFirebaseMode && db) {
+        db.ref(`tasks/${task.id}`).set(task);
+    } else {
+        const idx = tasks.findIndex(t => t.id === task.id);
+        if (idx >= 0) tasks[idx] = task; else tasks.push(task);
+        saveLocal();
+        renderAll();
+    }
+}
 
-                tasks = storedTasks ? JSON.parse(storedTasks) : JSON.parse(JSON.stringify(DEFAULT_TASKS));
-                notes = storedNotes ? JSON.parse(storedNotes) : JSON.parse(JSON.stringify(DEFAULT_NOTES));
-            } catch (e) {
-                console.warn("localStorage tasks access blocked, loading safe in-memory data.", e);
-                tasks = JSON.parse(JSON.stringify(DEFAULT_TASKS));
-                notes = JSON.parse(JSON.stringify(DEFAULT_NOTES));
-            }
-        }
+function removeTask(id) {
+    if (isFirebaseMode && db) {
+        db.ref(`tasks/${id}`).remove();
+    } else {
+        tasks = tasks.filter(t => t.id !== id);
+        saveLocal();
+        renderAll();
+    }
+}
 
-        function saveLocalFallbackData() {
-            try {
-                localStorage.setItem("medical_bus_tasks", JSON.stringify(tasks));
-                localStorage.setItem("medical_bus_notes", JSON.stringify(notes));
-            } catch (e) {
-                console.warn("Unable to save backup to localStorage:", e);
-            }
-        }
+window.deleteTask = function(id) {
+    if (!confirm('確定要刪除此任務嗎？')) return;
+    const t = tasks.find(t => t.id === id);
+    if (t) logActivity(`刪除任務：${t.name}`);
+    removeTask(id);
+    showAlert('刪除成功', '任務已移除', 'warning');
+};
 
-        // 穩定的 UTF-8 Base64 編解碼器 (防範中文字元、大檔案及換行符號問題)
-        function decodeBase64Utf8(base64Str) {
-            // 先過濾所有的換行符號與空白
-            const cleanBase64 = base64Str.replace(/\s/g, '');
-            const binaryString = atob(cleanBase64);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-            }
-            return new TextDecoder("utf-8").decode(bytes);
-        }
+window.editTask = function(id) {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    document.getElementById('task-modal-title').textContent = '編輯任務';
+    document.getElementById('form-task-id').value = task.id;
+    document.getElementById('form-task-name').value = task.name;
+    document.getElementById('form-task-assignee').value = task.assignee || '';
+    document.getElementById('form-task-category').value = task.category || '';
+    document.getElementById('form-task-start').value = task.start || '';
+    document.getElementById('form-task-end').value = task.end || '';
+    document.getElementById('form-task-progress').value = task.progress || 0;
+    document.getElementById('form-task-status').value = task.status || 'Not Started';
+    document.getElementById('form-task-notes').value = task.notes || '';
+    document.getElementById('task-modal').classList.remove('hidden');
+    lucide.createIcons();
+};
 
-        function encodeBase64Utf8(str) {
-            const bytes = new TextEncoder().encode(str);
-            let binaryString = "";
-            for (let i = 0; i < bytes.byteLength; i++) {
-                binaryString += String.fromCharCode(bytes[i]);
-            }
-            return btoa(binaryString);
-        }
+document.getElementById('task-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const id = document.getElementById('form-task-id').value || uid();
+    const name = document.getElementById('form-task-name').value.trim();
+    const start = document.getElementById('form-task-start').value;
+    const end = document.getElementById('form-task-end').value;
+    if (start && end && new Date(start) > new Date(end)) {
+        showAlert('日期錯誤', '開始日不能晚於結束日', 'error'); return;
+    }
+    const existing = tasks.find(t => t.id === id);
+    const task = {
+        id,
+        name,
+        assignee: document.getElementById('form-task-assignee').value.trim(),
+        category: document.getElementById('form-task-category').value.trim(),
+        start,
+        end,
+        progress: parseInt(document.getElementById('form-task-progress').value) || 0,
+        status: document.getElementById('form-task-status').value,
+        notes: document.getElementById('form-task-notes').value.trim(),
+        updatedBy: currentUser.name || '未知',
+        updatedAt: Date.now(),
+        createdAt: existing ? (existing.createdAt || Date.now()) : Date.now()
+    };
+    logActivity(`${existing ? '更新' : '新增'}任務：${name}`);
+    saveTask(task);
+    closeTaskModal();
+    showAlert(existing ? '更新完成' : '新增成功', `任務「${name}」已儲存`, 'success');
+});
 
-        // 3. GitHub API 雙向對接核心 (Commit & Fetch JSON)
-        async function pullDataFromGitHub() {
-            const url = `https://api.github.com/repos/${gitConfig.owner}/${gitConfig.repo}/contents/${gitConfig.path}?ref=${gitConfig.branch}`;
-            
-            const cleanToken = gitConfig.token.trim();
-            const headers = {
-                "Accept": "application/vnd.github.v3+json",
-                "Cache-Control": "no-cache"
-            };
-            if (cleanToken) {
-                headers["Authorization"] = `Bearer ${cleanToken}`;
-            }
+function closeTaskModal() {
+    document.getElementById('task-modal').classList.add('hidden');
+    document.getElementById('task-form').reset();
+    document.getElementById('form-task-id').value = '';
+}
+document.getElementById('task-modal-close').addEventListener('click', closeTaskModal);
+document.getElementById('task-form-cancel').addEventListener('click', closeTaskModal);
+document.getElementById('btn-add-task').addEventListener('click', () => {
+    document.getElementById('task-modal-title').textContent = '新增工作任務';
+    document.getElementById('task-form').reset();
+    document.getElementById('form-task-id').value = '';
+    document.getElementById('form-task-start').value = today();
+    document.getElementById('form-task-progress').value = 0;
+    document.getElementById('task-modal').classList.remove('hidden');
+    lucide.createIcons();
+});
 
-            const response = await fetch(url, { headers });
-            if (!response.ok) {
-                if (response.status === 404) {
-                    // 找不到檔案，可能為新專案：自動提交初始預設 WBS 進度 JSON 到 GitHub
-                    console.log("GitHub file not found. Seeding initial JSON database...");
-                    tasks = JSON.parse(JSON.stringify(DEFAULT_TASKS));
-                    notes = JSON.parse(JSON.stringify(DEFAULT_NOTES));
-                    await pushDataToGitHub();
-                    return;
-                } else if (response.status === 401) {
-                    throw new Error("GitHub 驗證失敗 (401)：請檢查您的個人存取權杖 (Token) 是否過期、已被撤銷，或權利不足。");
-                } else {
-                    throw new Error(`GitHub 讀取失敗 (${response.status})：${response.statusText}`);
-                }
-            }
+// ══════════════════════════════════════════
+// NOTES CRUD
+// ══════════════════════════════════════════
+document.getElementById('note-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const note = {
+        id: uid(),
+        title: document.getElementById('form-note-title').value.trim(),
+        content: document.getElementById('form-note-content').value.trim(),
+        author: currentUser.name || '匿名',
+        date: today(),
+        createdAt: Date.now()
+    };
+    if (isFirebaseMode && db) {
+        db.ref(`notes/${note.id}`).set(note);
+    } else {
+        notes.unshift(note);
+        saveLocal();
+        renderNotes();
+    }
+    logActivity(`新增備忘：${note.title}`);
+    closeNoteModal();
+    showAlert('備忘已儲存', '筆記已成功加入', 'success');
+});
 
-            const fileMeta = await response.json();
-            
-            try {
-                // 使用升級版的 UTF-8 專用 Base64 解碼器
-                const decodedContent = decodeBase64Utf8(fileMeta.content);
-                const payload = JSON.parse(decodedContent);
+window.deleteNote = function(id) {
+    if (isFirebaseMode && db) {
+        db.ref(`notes/${id}`).remove();
+    } else {
+        notes = notes.filter(n => n.id !== id);
+        saveLocal();
+        renderNotes();
+    }
+};
+function closeNoteModal() {
+    document.getElementById('note-modal').classList.add('hidden');
+    document.getElementById('note-form').reset();
+}
+document.getElementById('note-modal-close').addEventListener('click', closeNoteModal);
+document.getElementById('note-form-cancel').addEventListener('click', closeNoteModal);
+document.getElementById('btn-add-note').addEventListener('click', () => {
+    document.getElementById('note-modal').classList.remove('hidden');
+    lucide.createIcons();
+});
 
-                if (payload && payload.tasks && payload.notes) {
-                    tasks = payload.tasks;
-                    notes = payload.notes;
-                    saveLocalFallbackData(); // 本地緩存備份
-                } else {
-                    throw new Error("JSON 格式未包含 tasks 或 notes 進度欄位。");
-                }
-            } catch (err) {
-                throw new Error(`解析 GitHub JSON 檔案失敗，資料可能損壞：${err.message}`);
-            }
-        }
+// ══════════════════════════════════════════
+// RENDER FUNCTIONS
+// ══════════════════════════════════════════
+function renderAll() {
+    renderMetrics();
+    renderTaskTable();
+}
 
-        async function pushDataToGitHub() {
-            if (!isGitHubLinked) {
-                saveLocalFallbackData();
-                return;
-            }
+function renderMetrics() {
+    const total = tasks.length;
+    const done = tasks.filter(t => t.status === 'Complete').length;
+    const inProgress = tasks.filter(t => t.status === 'In Progress').length;
+    const delayed = tasks.filter(t => t.status === 'Delayed').length;
+    const avg = total === 0 ? 0 : Math.round(tasks.reduce((s, t) => s + (t.progress || 0), 0) / total);
 
-            syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span> 同步至 GitHub...`;
-            const url = `https://api.github.com/repos/${gitConfig.owner}/${gitConfig.repo}/contents/${gitConfig.path}`;
-            
-            const cleanToken = gitConfig.token.trim();
-            const headers = {
-                "Accept": "application/vnd.github.v3+json",
-                "Content-Type": "application/json"
-            };
-            if (cleanToken) {
-                headers["Authorization"] = `Bearer ${cleanToken}`;
-            }
+    document.getElementById('metric-progress').textContent = `${avg}%`;
+    document.getElementById('metric-progress-bar').style.width = `${avg}%`;
+    document.getElementById('metric-done').textContent = `${done} 項`;
+    document.getElementById('metric-total').textContent = total;
+    document.getElementById('metric-inprogress').textContent = `${inProgress} 項`;
+    document.getElementById('metric-delayed').textContent = `${delayed} 項`;
+}
 
-            // 步驟 A: 獲取最新的 File SHA
-            let fileSha = null;
-            try {
-                const getRes = await fetch(`${url}?ref=${gitConfig.branch}`, { headers });
-                if (getRes.ok) {
-                    const fileMeta = await getRes.json();
-                    if (fileMeta) fileSha = fileMeta.sha;
-                }
-            } catch (e) {
-                console.log("File is new, no SHA detected.");
-            }
+function renderTaskTable() {
+    const tbody = document.getElementById('task-table-body');
+    let filtered = tasks;
 
-            // 步驟 B: 打包進度，編譯為安全的 Base64
-            const payload = { tasks, notes };
-            const jsonString = JSON.stringify(payload, null, 2);
-            const base64Content = encodeBase64Utf8(jsonString);
+    if (currentFilter !== 'all') {
+        filtered = filtered.filter(t => t.status === currentFilter);
+    }
+    if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        filtered = filtered.filter(t =>
+            t.name.toLowerCase().includes(q) ||
+            (t.assignee || '').toLowerCase().includes(q) ||
+            (t.category || '').toLowerCase().includes(q)
+        );
+    }
 
-            const commitMessage = `更新醫療巡迴車特裝進度與日誌: ${new Date().toLocaleString()}`;
-            const body = {
-                message: commitMessage,
-                content: base64Content,
-                branch: gitConfig.branch
-            };
-            if (fileSha) body.sha = fileSha;
+    document.getElementById('task-count-badge').textContent = `共 ${filtered.length} 項`;
 
-            // 步驟 C: PUT 提交檔案到 GitHub
-            const putResponse = await fetch(url, {
-                method: "PUT",
-                headers,
-                body: JSON.stringify(body)
-            });
+    if (filtered.length === 0) {
+        tbody.innerHTML = `
+            <tr><td colspan="7" class="py-12 text-center text-slate-400 text-sm">
+                <i data-lucide="search-x" class="w-10 h-10 mx-auto mb-3 text-slate-300"></i>
+                <p class="font-semibold">沒有符合的任務</p>
+            </td></tr>`;
+        lucide.createIcons();
+        return;
+    }
 
-            if (!putResponse.ok) {
-                const errorDetail = await putResponse.json();
-                if (putResponse.status === 401) {
-                    throw new Error("GitHub 寫入失敗 (401)：Token 權限無效。");
-                } else if (putResponse.status === 404) {
-                    throw new Error("GitHub 寫入失敗 (404)：找不到指定的分支或路徑。");
-                } else {
-                    throw new Error(errorDetail.message || `寫入失敗 (${putResponse.status})`);
-                }
-            }
-
-            console.log("GitHub commit completed successfully.");
-            syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> GitHub 同步中`;
-        }
-
-        // 4. 進度、異常、時差計算
-        function calculateProjectMetrics() {
-            const today = new Date("2026-05-31");
-            const timeDiff = PROJECT_END.getTime() - today.getTime();
-            const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
-            
-            if (daysLeft > 0) {
-                metricDaysLeft.innerHTML = `<i data-lucide="clock" class="w-3.5 h-3.5"></i> 距離交車與驗收還有 <span class="font-bold text-slate-800 text-sm">${daysLeft}</span> 天`;
-            } else if (daysLeft === 0) {
-                metricDaysLeft.innerHTML = `<i data-lucide="clock" class="w-3.5 h-3.5"></i> <span class="text-rose-600 font-extrabold text-sm">今天就是交車日！</span>`;
-            } else {
-                metricDaysLeft.innerHTML = `<i data-lucide="clock" class="w-3.5 h-3.5"></i> <span class="text-rose-600 font-bold text-sm">專案已逾期 ${Math.abs(daysLeft)} 天！</span>`;
-            }
-
-            let totalWeight = 0;
-            let weightedProgress = 0;
-            let warningsCount = 0;
-
-            tasks.forEach(t => {
-                const s = new Date(t.start);
-                const e = new Date(t.end);
-                const duration = Math.max(1, (e.getTime() - s.getTime()) / (1000 * 3600 * 24));
-                totalWeight += duration;
-                weightedProgress += (t.progress / 100) * duration;
-
-                if (t.status === "Delayed") {
-                    warningsCount++;
-                }
-            });
-
-            const overallPct = totalWeight > 0 ? Math.round((weightedProgress / totalWeight) * 100) : 0;
-            metricProgress.textContent = `${overallPct}%`;
-            metricProgressBar.style.width = `${overallPct}%`;
-            metricWarnings.textContent = `${warningsCount} 項`;
-
-            // 更新里程碑
-            milestones.forEach(m => {
-                const associatedTask = tasks.find(t => t.id === m.task);
-                if (associatedTask) {
-                    m.complete = (associatedTask.status === "Complete");
-                } else {
-                    m.complete = false;
-                }
-            });
-
-            updateIcons();
-        }
-
-        // 5. 數據表格與甘特圖渲染
-        const phaseColorMap = {
-            1: { bg: "bg-blue-500", text: "text-blue-500", lightBg: "bg-blue-50", hover: "hover:bg-blue-100", title: "一階段" },
-            2: { bg: "bg-indigo-500", text: "text-indigo-500", lightBg: "bg-indigo-50", hover: "hover:bg-indigo-100", title: "二階段" },
-            3: { bg: "bg-teal-500", text: "text-teal-500", lightBg: "bg-teal-50", hover: "hover:bg-teal-100", title: "三階段" },
-            4: { bg: "bg-purple-500", text: "text-purple-500", lightBg: "bg-purple-50", hover: "hover:bg-purple-100", title: "四階段" },
-            5: { bg: "bg-rose-500", text: "text-rose-500", lightBg: "bg-rose-50", hover: "hover:bg-rose-100", title: "五階段" }
-        };
-
-        function renderTaskList() {
-            taskListBody.innerHTML = "";
-            const filteredTasks = currentFilter === "all" 
-                ? tasks 
-                : tasks.filter(t => t.phase.toString() === currentFilter);
-
-            taskCount.textContent = `共 ${filteredTasks.length} 項任務`;
-
-            if (filteredTasks.length === 0) {
-                taskListBody.innerHTML = `
-                    <tr>
-                        <td colspan="6" class="py-8 text-center text-slate-400 text-sm">
-                            <i data-lucide="info" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
-                            本工程階段目前無任何管控任務。
-                        </td>
-                    </tr>
-                `;
-                updateIcons();
-                return;
-            }
-
-            filteredTasks.forEach(task => {
-                const phaseMeta = phaseColorMap[task.phase];
-                
-                let statusBadge = "";
-                if (task.status === "Complete") {
-                    statusBadge = `<span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-xs px-2.5 py-1 rounded-full font-bold">已完成</span>`;
-                } else if (task.status === "In Progress") {
-                    statusBadge = `<span class="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs px-2.5 py-1 rounded-full font-bold">進行中</span>`;
-                } else if (task.status === "Delayed") {
-                    statusBadge = `<span class="inline-flex items-center gap-1 bg-rose-50 text-rose-700 text-xs px-2.5 py-1 rounded-full font-bold">已滯後</span>`;
-                } else {
-                    statusBadge = `<span class="inline-flex items-center gap-1 bg-slate-50 text-slate-600 text-xs px-2.5 py-1 rounded-full font-medium">未開始</span>`;
-                }
-
-                const tr = document.createElement("tr");
-                tr.className = "hover:bg-slate-50/50 transition-colors";
-                tr.innerHTML = `
-                    <td class="py-4 px-4 text-center">
-                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${phaseMeta.bg} text-white shadow-sm" title="${phaseMeta.title}">
-                            ${task.phase}
-                        </span>
-                    </td>
-                    <td class="py-4 px-4">
-                        <div class="font-semibold text-slate-800 text-sm">${task.name}</div>
-                        <div class="text-xs text-slate-400 mt-0.5 font-medium leading-relaxed">${task.notes || '暫無查驗說明'}</div>
-                    </td>
-                    <td class="py-4 px-4 text-center">
-                        <div class="text-xs font-bold text-slate-700">${formatDate(task.start)}</div>
-                        <div class="text-[10px] text-slate-400 font-medium">至</div>
-                        <div class="text-xs font-bold text-slate-700">${formatDate(task.end)}</div>
-                    </td>
-                    <td class="py-4 px-4 text-center">
-                        <div class="flex flex-col items-center gap-1">
-                            <span class="text-xs font-extrabold text-slate-700">${task.progress}%</span>
-                            <div class="w-12 bg-slate-100 rounded-full h-1">
-                                <div class="bg-indigo-600 h-1 rounded-full" style="width: ${task.progress}%"></div>
-                            </div>
-                        </div>
-                    </td>
-                    <td class="py-4 px-4 text-center">${statusBadge}</td>
-                    <td class="py-4 px-4 text-center">
-                        <div class="flex items-center justify-center gap-1.5">
-                            <button data-task-id="${task.id}" class="btn-edit-task p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-blue-600 transition-all" title="編輯項目">
-                                <i data-lucide="edit-3" class="w-4 h-4"></i>
-                            </button>
-                            <button data-task-id="${task.id}" class="btn-delete-task p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-rose-600 transition-all" title="刪除項目">
-                                <i data-lucide="trash-2" class="w-4 h-4"></i>
-                            </button>
-                        </div>
-                    </td>
-                `;
-                taskListBody.appendChild(tr);
-            });
-
-            // 綁定動態事件鍵
-            document.querySelectorAll(".btn-edit-task").forEach(btn => {
-                btn.addEventListener("click", () => editTask(btn.dataset.taskId));
-            });
-            document.querySelectorAll(".btn-delete-task").forEach(btn => {
-                btn.addEventListener("click", () => deleteTask(btn.dataset.taskId));
-            });
-
-            updateIcons();
-        }
-
-        function renderGanttChart() {
-            ganttContainer.innerHTML = "";
-            const totalDays = 92;
-            
-            let headerHtml = `
-                <div class="min-w-[840px] flex border-b border-slate-100 pb-2 text-xs font-bold text-slate-400">
-                    <div class="w-64 flex-shrink-0 text-left"> WBS 改裝管制項目</div>
-                    <div class="flex-1 flex justify-between relative px-2">
-                        <div class="text-left w-1/3">6月 (底盤與骨架)</div>
-                        <div class="text-center w-1/3 border-l border-slate-100">7月 (內裝與特裝)</div>
-                        <div class="text-right w-1/3 border-l border-slate-100">8月 (設備、領牌與驗收)</div>
+    tbody.innerHTML = filtered.map((task, idx) => {
+        const sm = STATUS_MAP[task.status] || STATUS_MAP['Not Started'];
+        const progressColor = task.progress >= 100 ? 'bg-emerald-500' : task.progress >= 50 ? 'bg-blue-500' : 'bg-amber-400';
+        const dateStr = (task.start && task.end) ? `${task.start.slice(5)}<br><span class="text-slate-400">至</span><br>${task.end.slice(5)}` : '—';
+        return `
+        <tr class="hover:bg-slate-50/60 transition-colors group" id="row-${task.id}">
+            <td class="py-3.5 px-4 text-xs text-slate-400 font-bold text-center">${idx + 1}</td>
+            <td class="py-3.5 px-4">
+                <div class="font-semibold text-slate-800 text-sm">${task.name}</div>
+                ${task.category ? `<span class="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-bold mt-0.5 inline-block">${task.category}</span>` : ''}
+                ${task.notes ? `<div class="text-xs text-slate-400 mt-0.5 leading-relaxed">${task.notes}</div>` : ''}
+            </td>
+            <td class="py-3.5 px-4 text-center">
+                ${task.assignee ? `
+                <div class="flex items-center justify-center gap-1.5">
+                    <div class="w-6 h-6 rounded-full bg-blue-400 flex items-center justify-center text-white text-[10px] font-black">${initials(task.assignee)}</div>
+                    <span class="text-xs font-semibold text-slate-700">${task.assignee}</span>
+                </div>` : '<span class="text-xs text-slate-300">未指派</span>'}
+            </td>
+            <td class="py-3.5 px-4 text-center text-[11px] font-semibold text-slate-600 leading-relaxed">${dateStr}</td>
+            <td class="py-3.5 px-4 text-center">
+                <div class="flex flex-col items-center gap-1">
+                    <span class="text-xs font-extrabold text-slate-700">${task.progress}%</span>
+                    <div class="w-14 bg-slate-100 rounded-full h-1.5">
+                        <div class="${progressColor} h-1.5 rounded-full transition-all" style="width:${task.progress}%"></div>
                     </div>
                 </div>
-            `;
-
-            let rowsHtml = `<div class="min-w-[840px] mt-3 space-y-2.5">`;
-
-            tasks.forEach(task => {
-                const phaseMeta = phaseColorMap[task.phase];
-                const sDate = new Date(task.start);
-                const eDate = new Date(task.end);
-                
-                const startDiff = (sDate.getTime() - PROJECT_START.getTime()) / (1000 * 3600 * 24);
-                const duration = Math.max(1, (eDate.getTime() - sDate.getTime()) / (1000 * 3600 * 24));
-                
-                const leftPercent = (startDiff / totalDays) * 100;
-                const widthPercent = (duration / totalDays) * 100;
-
-                let barBg = phaseMeta.bg;
-                if (task.status === "Complete") {
-                    barBg = "bg-emerald-500";
-                } else if (task.status === "Delayed") {
-                    barBg = "bg-rose-500 animate-pulse";
-                }
-
-                rowsHtml += `
-                    <div class="flex items-center py-1 group hover:bg-slate-50 rounded-lg transition-colors">
-                        <div class="w-64 flex-shrink-0 pr-4 flex items-center gap-2">
-                            <span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-extrabold ${phaseMeta.bg} text-white flex-shrink-0">
-                                ${task.phase}
-                            </span>
-                            <span class="text-xs font-semibold text-slate-700 truncate" title="${task.name}">${task.name}</span>
-                        </div>
-                        <div class="flex-1 relative h-6 bg-slate-50 rounded-md">
-                            <div class="absolute h-4 rounded-full ${barBg} top-1 shadow-sm transition-all flex items-center justify-end pr-1.5"
-                                 style="left: ${leftPercent}%; width: ${widthPercent}%;">
-                                <span class="text-[9px] font-black text-white leading-none">${task.progress}%</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-
-            rowsHtml += `</div>`;
-            ganttContainer.innerHTML = headerHtml + rowsHtml;
-        }
-
-        function renderMilestones() {
-            milestonesContainer.innerHTML = "";
-            milestones.forEach(m => {
-                const isComplete = m.complete;
-                const itemClass = isComplete ? "opacity-80" : "hover:border-slate-200";
-                const bgIcon = isComplete ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-slate-50 text-slate-400 border-slate-100";
-                const iconName = isComplete ? "check" : "circle";
-                
-                const today = new Date("2026-05-31");
-                const [yearOffset, month, day] = m.date.split("/");
-                const absoluteYear = 2026;
-                const mDate = new Date(`${absoluteYear}-${month}-${day}`);
-                const isOverdue = !isComplete && mDate < today;
-
-                const card = document.createElement("div");
-                card.className = `flex gap-3.5 p-3.5 rounded-xl border border-slate-100 bg-white transition-all shadow-sm ${itemClass}`;
-                card.innerHTML = `
-                    <div class="w-8 h-8 rounded-full border flex items-center justify-center flex-shrink-0 ${bgIcon}">
-                        <i data-lucide="${iconName}" class="w-4 h-4"></i>
-                    </div>
-                    <div class="flex-1">
-                        <div class="flex items-center justify-between gap-1.5">
-                            <h4 class="text-xs font-bold text-slate-800 leading-tight">${m.name}</h4>
-                            ${isOverdue ? '<span class="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-black flex-shrink-0">急件/落後</span>' : ''}
-                            ${isComplete ? '<span class="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold flex-shrink-0">已完成</span>' : ''}
-                        </div>
-                        <div class="flex items-center justify-between text-[10px] text-slate-400 mt-1 font-semibold">
-                            <span>基準完工日：${m.date}</span>
-                            <span>里程碑 ${m.id.toUpperCase()}</span>
-                        </div>
-                    </div>
-                `;
-                milestonesContainer.appendChild(card);
-            });
-            updateIcons();
-        }
-
-        function renderNotes() {
-            notesContainer.innerHTML = "";
-            if (notes.length === 0) {
-                notesContainer.innerHTML = `<p class="text-xs text-slate-400 text-center py-4">目前尚無任何查驗備忘筆記。</p>`;
-                return;
-            }
-
-            notes.forEach(note => {
-                const item = document.createElement("div");
-                item.className = "p-3.5 bg-slate-50 hover:bg-slate-100/70 border border-slate-100 rounded-xl transition-all relative group";
-                item.innerHTML = `
-                    <button data-note-id="${note.id}" class="btn-delete-note absolute top-2.5 right-2.5 p-1 text-slate-400 hover:text-rose-600 rounded opacity-0 group-hover:opacity-100 transition-opacity" title="刪除筆記">
-                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </td>
+            <td class="py-3.5 px-4 text-center">
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${sm.cls}">${sm.label}</span>
+            </td>
+            <td class="py-3.5 px-4 text-center">
+                <div class="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onclick="editTask('${task.id}')" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-blue-600 transition-all" title="編輯">
+                        <i data-lucide="edit-3" class="w-4 h-4"></i>
                     </button>
-                    <h4 class="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
-                        <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                        ${note.title}
-                    </h4>
-                    <p class="text-[11px] text-slate-500 mt-1.5 leading-relaxed font-medium">${note.content}</p>
-                    <div class="flex items-center justify-between text-[10px] text-slate-400 mt-2 font-bold">
-                        <span>時間：${note.date}</span>
-                        <span>查驗：${note.author}</span>
-                    </div>
-                `;
-                notesContainer.appendChild(item);
-            });
+                    <button onclick="deleteTask('${task.id}')" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-rose-600 transition-all" title="刪除">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+    lucide.createIcons();
+}
 
-            document.querySelectorAll(".btn-delete-note").forEach(btn => {
-                btn.addEventListener("click", () => deleteNote(btn.dataset.noteId));
-            });
+function renderNotes() {
+    const container = document.getElementById('notes-container');
+    if (!notes.length) {
+        container.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">尚無備忘筆記</p>';
+        return;
+    }
+    container.innerHTML = notes.map(n => `
+        <div class="p-3.5 bg-slate-50 hover:bg-slate-100/70 border border-slate-100 rounded-xl transition-all relative group fade-in">
+            <button onclick="deleteNote('${n.id}')" class="absolute top-2.5 right-2.5 p-1 text-slate-300 hover:text-rose-500 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </button>
+            <h4 class="text-xs font-extrabold text-slate-800 pr-5">${n.title}</h4>
+            <p class="text-[11px] text-slate-500 mt-1.5 leading-relaxed">${n.content}</p>
+            <div class="flex items-center justify-between text-[10px] text-slate-400 mt-2 font-semibold">
+                <span>${n.date}</span><span>${n.author}</span>
+            </div>
+        </div>
+    `).join('');
+    lucide.createIcons();
+}
 
-            updateIcons();
-        }
+function renderActivity() {
+    const container = document.getElementById('activity-log');
+    if (!activityLogs.length) {
+        container.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">等待使用者操作...</p>';
+        return;
+    }
+    container.innerHTML = activityLogs.map(a => `
+        <div class="flex items-start gap-2.5 fade-in">
+            <div class="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 mt-0.5 bg-blue-400">${initials(a.user)}</div>
+            <div class="flex-1 min-w-0">
+                <p class="text-xs text-slate-700 font-semibold leading-snug">${a.msg}</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">${a.user} · ${a.time}</p>
+            </div>
+        </div>
+    `).join('');
+}
 
-        function formatDate(dateStr) {
-            const d = new Date(dateStr);
-            const mm = String(d.getMonth() + 1).padStart(2, '0');
-            const dd = String(d.getDate()).padStart(2, '0');
-            return `115/${mm}/${dd}`;
-        }
+// ══════════════════════════════════════════
+// FILTERS & SEARCH
+// ══════════════════════════════════════════
+document.getElementById('status-filters').addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    document.querySelectorAll('.filter-btn').forEach(b => {
+        b.className = 'filter-btn px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:bg-slate-100 transition-all';
+    });
+    btn.className = 'filter-btn px-3 py-1.5 text-xs font-bold rounded-lg bg-blue-600 text-white transition-all';
+    currentFilter = btn.dataset.status;
+    renderTaskTable();
+});
 
-        function renderAll() {
-            calculateProjectMetrics();
-            renderTaskList();
-            renderGanttChart();
-            renderMilestones();
-            renderNotes();
-        }
+document.getElementById('search-input').addEventListener('input', e => {
+    searchQuery = e.target.value.trim();
+    renderTaskTable();
+});
 
-        // 6. UI 表單控制與事件處理 (自訂對話窗取代原生 alert/confirm)
-        function showCustomAlert(title, message, type = "success") {
-            const modal = document.getElementById("alert-modal");
-            const container = document.getElementById("alert-icon-container");
-            const icon = document.getElementById("alert-icon");
-            const t = document.getElementById("alert-title");
-            const m = document.getElementById("alert-message");
+// ══════════════════════════════════════════
+// EXPORT & PRINT
+// ══════════════════════════════════════════
+document.getElementById('btn-export').addEventListener('click', () => {
+    let csv = '﻿#,任務名稱,負責人,類別,開始日,結束日,進度(%),狀態,備註\r\n';
+    tasks.forEach((t, i) => {
+        const statusLabel = STATUS_MAP[t.status]?.label || t.status;
+        csv += `${i+1},"${t.name}","${t.assignee||''}","${t.category||''}",${t.start||''},${t.end||''},${t.progress},${statusLabel},"${(t.notes||'').replace(/"/g,'""')}"\r\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `網一月山金難工作進度_${today()}.csv`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+});
 
-            t.textContent = title;
-            m.innerHTML = message; // 改用 innerHTML 以支援換行與鏈接提示
+document.getElementById('btn-print').addEventListener('click', () => window.print());
 
-            if (type === "success") {
-                container.className = "mx-auto w-12 h-12 rounded-full flex items-center justify-center bg-emerald-50 text-emerald-600";
-                icon.setAttribute("data-lucide", "check-circle");
-            } else if (type === "warning") {
-                container.className = "mx-auto w-12 h-12 rounded-full flex items-center justify-center bg-amber-50 text-amber-600";
-                icon.setAttribute("data-lucide", "alert-triangle");
-            } else {
-                container.className = "mx-auto w-12 h-12 rounded-full flex items-center justify-center bg-red-50 text-red-600";
-                icon.setAttribute("data-lucide", "x-circle");
-            }
+// ══════════════════════════════════════════
+// ALERT MODAL
+// ══════════════════════════════════════════
+function showAlert(title, msg, type = 'success') {
+    const wrap = document.getElementById('alert-icon-wrap');
+    const icon = document.getElementById('alert-icon');
+    const typeMap = {
+        success: ['bg-emerald-50 text-emerald-600', 'check-circle'],
+        warning: ['bg-amber-50 text-amber-600', 'alert-triangle'],
+        error:   ['bg-rose-50 text-rose-600', 'x-circle']
+    };
+    const [cls, iconName] = typeMap[type] || typeMap.success;
+    wrap.className = `mx-auto w-12 h-12 rounded-full flex items-center justify-center ${cls}`;
+    icon.setAttribute('data-lucide', iconName);
+    document.getElementById('alert-title').textContent = title;
+    document.getElementById('alert-msg').textContent = msg;
+    document.getElementById('alert-modal').classList.remove('hidden');
+    lucide.createIcons();
+}
 
-            modal.classList.remove("hidden");
-            updateIcons();
-        }
+document.getElementById('alert-close-btn').addEventListener('click', () => {
+    document.getElementById('alert-modal').classList.add('hidden');
+});
 
-        document.getElementById("alert-btn-close").addEventListener("click", () => {
-            document.getElementById("alert-modal").classList.add("hidden");
-        });
+// Username Enter key
+document.getElementById('username-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') saveUserName();
+});
 
-        // 階段過濾器
-        phaseFilters.addEventListener("click", (e) => {
-            const btn = e.target.closest("button");
-            if (!btn) return;
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+    loadUser();
+    if (!currentUser.name) {
+        document.getElementById('username-modal').classList.remove('hidden');
+    } else {
+        document.getElementById('username-modal').classList.add('hidden');
+    }
 
-            document.querySelectorAll(".filter-btn").forEach(b => {
-                b.className = "filter-btn px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:bg-slate-100 transition-all";
-            });
+    loadLocal();
+    tryAutoConnectFirebase();
 
-            btn.className = "filter-btn px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-blue-600 text-white shadow-sm";
-            currentFilter = btn.dataset.phase;
-            renderTaskList();
-        });
+    if (!isFirebaseMode) {
+        document.getElementById('firebase-banner').classList.remove('hidden');
+    }
 
-        // 任務表單彈窗
-        const taskModal = document.getElementById("task-modal");
-        const btnAddTask = document.getElementById("btn-add-task");
-        const modalClose = document.getElementById("modal-close");
-        const formBtnCancel = document.getElementById("form-btn-cancel");
-        const taskForm = document.getElementById("task-form");
-
-        btnAddTask.addEventListener("click", () => {
-            document.getElementById("modal-title").textContent = "新增管控任務";
-            taskForm.reset();
-            document.getElementById("form-task-id").value = "";
-            document.getElementById("form-task-start").value = "2026-06-01";
-            document.getElementById("form-task-end").value = "2026-06-10";
-            document.getElementById("form-task-progress").value = 0;
-            taskModal.classList.remove("hidden");
-        });
-
-        const closeModal = () => { taskModal.classList.add("hidden"); };
-        modalClose.addEventListener("click", closeModal);
-        formBtnCancel.addEventListener("click", closeModal);
-
-        function editTask(id) {
-            const task = tasks.find(t => t.id === id);
-            if (!task) return;
-
-            document.getElementById("modal-title").textContent = "修改管制項目資訊";
-            document.getElementById("form-task-id").value = task.id;
-            document.getElementById("form-task-phase").value = task.phase;
-            document.getElementById("form-task-name").value = task.name;
-            document.getElementById("form-task-start").value = task.start;
-            document.getElementById("form-task-end").value = task.end;
-            document.getElementById("form-task-progress").value = task.progress;
-            document.getElementById("form-task-status").value = task.status;
-
-            taskModal.classList.remove("hidden");
-        }
-
-        function deleteTask(id) {
-            showCustomConfirm(
-                "確認移除此工作項目？",
-                "刪除該項目後，將會對所有裝置同步，且該動作無法撤銷。",
-                async () => {
-                    tasks = tasks.filter(t => t.id !== id);
-                    try {
-                        await pushDataToGitHub();
-                        showCustomAlert("刪除成功", "該項改裝管制任務已被移除並同步。");
-                    } catch (e) {
-                        showCustomAlert("同步失敗", `本地已刪除，但 GitHub 同步發生問題: ${e.message}`, "error");
-                    }
-                    renderAll();
-                }
-            );
-        }
-
-        taskForm.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const id = document.getElementById("form-task-id").value;
-            const phase = parseInt(document.getElementById("form-task-phase").value);
-            const name = document.getElementById("form-task-name").value;
-            const start = document.getElementById("form-task-start").value;
-            const end = document.getElementById("form-task-end").value;
-            const progress = parseInt(document.getElementById("form-task-progress").value);
-            const status = document.getElementById("form-task-status").value;
-
-            if (new Date(start) > new Date(end)) {
-                showCustomAlert("時程設定錯誤", "「開始日」不能大於「結束日」！", "error");
-                return;
-            }
-
-            const taskData = { phase, name, start, end, progress, status };
-
-            if (id) {
-                const idx = tasks.findIndex(t => t.id === id);
-                if (idx > -1) tasks[idx] = { id, ...taskData };
-            } else {
-                tasks.push({ id: "t_" + Date.now(), ...taskData });
-            }
-
-            closeModal();
-
-            try {
-                await pushDataToGitHub();
-                showCustomAlert("更新成功", "進度已完美儲存並推送到您的 GitHub 儲存庫 JSON 資料中。");
-            } catch (err) {
-                showCustomAlert("本地更新完畢", `本地資料已更新，但推送到 GitHub 時失敗: ${err.message}`, "warning");
-            }
-            renderAll();
-        });
-
-        // 備忘錄彈窗
-        const noteModal = document.getElementById("note-modal");
-        const btnAddNote = document.getElementById("btn-add-note");
-        const noteModalClose = document.getElementById("note-modal-close");
-        const noteBtnCancel = document.getElementById("note-btn-cancel");
-        const noteForm = document.getElementById("note-form");
-
-        btnAddNote.addEventListener("click", () => {
-            noteForm.reset();
-            document.getElementById("form-note-author").value = "總務處專案小組";
-            noteModal.classList.remove("hidden");
-        });
-
-        const closeNoteModal = () => { noteModal.classList.add("hidden"); };
-        noteModalClose.addEventListener("click", closeNoteModal);
-        noteBtnCancel.addEventListener("click", closeNoteModal);
-
-        noteForm.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const title = document.getElementById("form-note-title").value;
-            const content = document.getElementById("form-note-content").value;
-            const author = document.getElementById("form-note-author").value;
-            const date = new Date().toISOString().split('T')[0];
-
-            notes.unshift({ id: "n_" + Date.now(), title, content, author, date });
-            closeNoteModal();
-
-            try {
-                await pushDataToGitHub();
-                showCustomAlert("備忘已儲存", "查驗與改裝備忘錄已同步推送到您的 GitHub JSON 中。");
-            } catch (err) {
-                showCustomAlert("本地已儲存", `本地備忘已存檔，但 GitHub 同步失敗: ${err.message}`, "warning");
-            }
-            renderNotes();
-        });
-
-        function deleteNote(id) {
-            showCustomConfirm(
-                "確認移除此筆備忘？",
-                "刪除此查驗紀錄將自動在雲端同步變更。",
-                async () => {
-                    notes = notes.filter(n => n.id !== id);
-                    try {
-                        await pushDataToGitHub();
-                        showCustomAlert("刪除成功", "該備忘資料已被移除並同步。");
-                    } catch (e) {
-                        showCustomAlert("同步失敗", `本地已刪除，但 GitHub 同步失敗: ${e.message}`, "error");
-                    }
-                    renderNotes();
-                }
-            );
-        }
-
-        // CSV 匯出
-        document.getElementById("btn-export").addEventListener("click", () => {
-            let csvContent = "\uFEFF階段,管制項目名稱,起迄日,進度,狀態\r\n";
-            tasks.forEach(t => {
-                csvContent += `${t.phase},"${t.name}",${t.start} ~ ${t.end},${t.progress}%,${t.status}\r\n`;
-            });
-            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-            const link = document.createElement("a");
-            const url = URL.createObjectURL(blob);
-            link.setAttribute("href", url);
-            link.setAttribute("download", `智慧醫療車時程進度表_${new Date().toISOString().split('T')[0]}.csv`);
-            link.style.visibility = "hidden";
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        });
-
-        document.getElementById("btn-print").addEventListener("click", () => { window.print(); });
-
-        // 還原與重設時程
-        document.getElementById("btn-reset").addEventListener("click", () => {
-            showCustomConfirm(
-                "確定重置數據？",
-                "此動作將會清除所有自訂進度，並重新載入 115年度 官方標準 16 項醫療車改裝時程，所有已在 GitHub 的使用者也會一併被重設。",
-                async () => {
-                    tasks = JSON.parse(JSON.stringify(DEFAULT_TASKS));
-                    notes = JSON.parse(JSON.stringify(DEFAULT_NOTES));
-                    try {
-                        await pushDataToGitHub();
-                        showCustomAlert("重置成功", "已還原為原廠 WBS 進度，並成功同步更新到 GitHub JSON。");
-                    } catch (e) {
-                        showCustomAlert("本地重設完畢", `本地已還原，但 GitHub 雲端同步失敗: ${e.message}`, "warning");
-                    }
-                    renderAll();
-                }
-            );
-        });
-
-        // 7. GitHub 設定彈窗管理與事件
-        const githubModal = document.getElementById("github-modal");
-        const btnGithubConfig = document.getElementById("btn-github-config");
-        const githubModalClose = document.getElementById("github-modal-close");
-        const githubBtnCancel = document.getElementById("github-btn-cancel");
-        const githubForm = document.getElementById("github-form");
-
-        btnGithubConfig.addEventListener("click", () => {
-            document.getElementById("form-git-owner").value = gitConfig.owner;
-            document.getElementById("form-git-repo").value = gitConfig.repo;
-            document.getElementById("form-git-branch").value = gitConfig.branch || "main";
-            document.getElementById("form-git-path").value = gitConfig.path || "data/medical_bus_data.json";
-            document.getElementById("form-git-token").value = gitConfig.token;
-            githubModal.classList.remove("hidden");
-        });
-
-        const closeGithubModal = () => { githubModal.classList.add("hidden"); };
-        githubModalClose.addEventListener("click", closeGithubModal);
-        githubBtnCancel.addEventListener("click", closeGithubModal);
-
-        githubForm.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const owner = document.getElementById("form-git-owner").value.trim();
-            const repo = document.getElementById("form-git-repo").value.trim();
-            const branch = document.getElementById("form-git-branch").value.trim();
-            const path = document.getElementById("form-git-path").value.trim();
-            const token = document.getElementById("form-git-token").value.trim();
-
-            syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span> 驗證連線...`;
-
-            // 測試 GitHub 連線是否有效
-            try {
-                const testUrl = `https://api.github.com/repos/${owner}/${repo}`;
-                
-                // 優雅降級測試：使用 Bearer 驗證並自動清除頭尾空白
-                const headers = { "Accept": "application/vnd.github.v3+json" };
-                if (token) {
-                    headers["Authorization"] = `Bearer ${token}`;
-                }
-
-                const testRes = await fetch(testUrl, { headers });
-
-                if (!testRes.ok) {
-                    if (testRes.status === 401) {
-                        throw new Error("GitHub 驗證失敗 (401 Unauthorized)：您的個人存取權杖 (Token) 無效或過期。請確認 Token 填寫正確且未被撤銷。");
-                    } else if (testRes.status === 404) {
-                        throw new Error("找不到儲存庫 (404 Not Found)：請檢查您的「帳號名稱」與「儲存庫名稱」是否拼寫正確。如果是私有儲存庫 (Private)，請確認您的 Token 具備 `repo` 存取權限。");
-                    } else if (testRes.status === 403) {
-                        throw new Error("拒絕存取 (403 Forbidden)：可能是 API 速率達到上限，或是 Token 權限不足。");
-                    } else {
-                        throw new Error(`連線失敗 (${testRes.status})：${testRes.statusText}`);
-                    }
-                }
-
-                // 通過驗證，寫入組態設定並儲存
-                gitConfig = { owner, repo, branch, path, token };
-                localStorage.setItem("medical_bus_git_config", JSON.stringify(gitConfig));
-                isGitHubLinked = true;
-
-                // 進行雙向同步載入
-                await pullDataFromGitHub();
-
-                closeGithubModal();
-                showCustomAlert("GitHub 綁定成功", "已順利連線並載入專屬進度 JSON 檔，未來您做的所有修改都會即時自動推播回 GitHub。");
-                
-                githubPathDisplay.textContent = `${owner}/${repo} (${branch})`;
-                syncBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> GitHub 同步模式`;
-                syncBadge.className = "bg-emerald-950 text-emerald-300 text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1 border border-emerald-500/20";
-                connectionIndicator.innerHTML = `<i data-lucide="cloud" class="w-4 h-4 text-emerald-400"></i> 與 GitHub 雲端 JSON 保持即時雙向連線`;
-                
-                renderAll();
-            } catch (err) {
-                closeGithubModal();
-                
-                // 針對常見的 "Failed to fetch" (TypeError) 沙盒攔截與 CORS 進行特定提示
-                if (err instanceof TypeError || err.message.includes("Failed to fetch")) {
-                    showCustomAlert(
-                        "GitHub 連線失敗 (Failed to fetch)", 
-                        `<div class="text-left space-y-2 text-xs">
-                            <p class="font-bold text-rose-600">這是典型的「瀏覽器安全沙盒/跨網域攔截」錯誤！</p>
-                            <p><strong>常見原因與排除方式：</strong></p>
-                            <ol class="list-decimal pl-4 space-y-1">
-                                <li><strong>您目前在 AI 的 Preview 預覽視窗內測試</strong>：瀏覽器會強制封鎖帶有 Authorization 標頭的跨網域請求。
-                                <br><span class="text-emerald-600 font-bold">➔ 解決方案：請將此網頁下載至您電腦本機雙擊開啟，或部署在 GitHub Pages 網址下測試，即可正常連線！</span></li>
-                                <li><strong>您的網路連線受限</strong>：公司防火牆或廣告攔截擴充功能（如 Brave Shield, uBlock）阻擋了 <code class="bg-slate-100 px-1 rounded text-red-500">api.github.com</code> 請求。</li>
-                                <li><strong>Token 金鑰含有非法換行符號或空白</strong>。</li>
-                            </ol>
-                        </div>`, 
-                        "error"
-                    );
-                } else {
-                    showCustomAlert("GitHub 連線失敗", err.message, "error");
-                }
-                fallbackToLocalStorage();
-            }
-        });
-
-        // 系統啟動
-        window.addEventListener("DOMContentLoaded", () => {
-            initSystem();
-        });
-    </script>
+    renderAll();
+    renderNotes();
+    renderActivity();
+    lucide.createIcons();
+});
+</script>
 </body>
 </html>
