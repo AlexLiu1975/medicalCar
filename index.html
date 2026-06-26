@@ -33,9 +33,14 @@
             <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500 flex-shrink-0"></i>
             <span><strong>目前為單機模式</strong>，資料僅儲存在本機瀏覽器。要啟用多人即時同步，請</span>
         </div>
-        <button onclick="showFirebaseModal()" class="bg-amber-500 hover:bg-amber-400 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1">
-            <i data-lucide="database" class="w-3.5 h-3.5"></i> 設定 Firebase 多人模式
-        </button>
+        <div class="flex gap-2">
+            <button onclick="retryFirebase()" class="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> 重新連線
+            </button>
+            <button onclick="showFirebaseModal()" class="bg-white/80 hover:bg-white text-amber-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 border border-amber-300">
+                <i data-lucide="settings" class="w-3.5 h-3.5"></i> 修改設定
+            </button>
+        </div>
     </div>
 </div>
 
@@ -550,15 +555,52 @@ function tryAutoConnectFirebase() {
     if (!saved) return;
     try {
         const config = JSON.parse(saved);
-        if (!firebase.apps.length) firebase.initializeApp(config);
+        if (!config.apiKey || !config.databaseURL || !config.projectId) return;
+        if (!firebase.apps.length) {
+            firebase.initializeApp(config);
+        }
         db = firebase.database();
         isFirebaseMode = true;
         updateSyncBadge(true);
         subscribeFirebase();
         registerPresence();
         document.getElementById('firebase-banner').classList.add('hidden');
+        document.getElementById('online-count').classList.remove('hidden');
     } catch (e) {
-        console.warn('Firebase auto-connect failed:', e);
+        console.error('Firebase auto-connect failed:', e);
+        document.getElementById('firebase-banner').classList.remove('hidden');
+    }
+}
+
+function retryFirebase() {
+    const saved = localStorage.getItem('wangyue_firebase');
+    if (!saved) {
+        showFirebaseModal();
+        return;
+    }
+    try {
+        const config = JSON.parse(saved);
+        if (!config.apiKey || !config.databaseURL || !config.projectId) {
+            showFirebaseModal();
+            return;
+        }
+        // 若已有 app 實例，直接取得 database
+        if (firebase.apps.length) {
+            db = firebase.apps[0].database();
+        } else {
+            firebase.initializeApp(config);
+            db = firebase.database();
+        }
+        isFirebaseMode = true;
+        updateSyncBadge(true);
+        subscribeFirebase();
+        registerPresence();
+        document.getElementById('firebase-banner').classList.add('hidden');
+        document.getElementById('online-count').classList.remove('hidden');
+        showAlert('連線成功', '已切換為 Firebase 多人即時同步模式！', 'success');
+    } catch (e) {
+        showAlert('連線失敗', `錯誤：${e.message}`, 'error');
+        console.error(e);
     }
 }
 
@@ -1057,3 +1099,4 @@ window.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+
